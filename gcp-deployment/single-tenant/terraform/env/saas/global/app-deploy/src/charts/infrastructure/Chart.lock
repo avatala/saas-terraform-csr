@@ -1,0 +1,15 @@
+dependencies:
+- name: nats
+  repository: https://nats-io.github.io/k8s/helm/charts/
+  version: 0.19.5
+- name: mongodb
+  repository: https://charts.bitnami.com/bitnami
+  version: 13.13.0
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 12.1.9
+- name: emqx
+  repository: https://repos.emqx.io/charts
+  version: 5.0.25
+digest: sha256:2f7d92aededbfeca94fcbb9c486151a185c7422d7b7db81e7013ce5c551cda67
+generated: "2023-11-23T15:58:12.936532466-08:00"

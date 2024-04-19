@@ -1,0 +1,72 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      sed -e "s/REGION_NAME/${_REGION}/g" -e "s/TEMP_SEED_PROJECT_ID/${_TEMP_SEED_PROJECT_ID}/g" -e "s/_TERRAFORM_CODE_BRANCH_NAME/${_TERRAFORM_CODE_BRANCH_NAME}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/APP_REPO_NAME/${_APP_REPO_GCR_NAME}/g"   terraform.tfvars.tpl > terraform.tfvars;
+      sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+      sed  -e "s/REGION_NAME/${_REGION}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/_TERRAFORM_CODE_BRANCH_NAME/${_TERRAFORM_CODE_BRANCH_NAME}/g" -e "s/LB_TYPE/${_LB_TYPE}/g" -e "s/APPREPONAME/${_APP_REPO_GCR_NAME}/g" -e "s/PROJECTID/${_TEMP_SEED_PROJECT_ID}/g" cron-job.yaml.tpl > cron-job.yaml
+      gcloud container clusters get-credentials ${_PREFIX}-tenant-cluster-us-ct1-01 --region ${_REGION} --project ${_PREFIX}-freemium-prj
+      kubectl apply -f cron-job.yaml
+      kubectl annotate --overwrite serviceaccount cronjob --namespace cronjob iam.gke.io/gcp-service-account=${_PREFIX}-cronjob@${_PREFIX}-freemium-prj.iam.gserviceaccount.com
+
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'schedule-query-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+  workerPool:
+    'projects/${_PREFIX}-anthos-hub/locations/${_REGION}/workerPools/${_PREFIX}-private-worker-pool'
+timeout: 86400s

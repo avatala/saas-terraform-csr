@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.ums.name  }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+  HTTP_PORT: {{ printf " " }}{{- include  "DomainManager.user-manager.port" . | quote}}
+  CLIENT_ID: {{ printf " " }}{{- include  "DomainManager.user-manager.clientId" . | quote}}
+  CLIENT_SECRET: {{ printf " " }}{{- include  "DomainManager.user-manager.clientSecret" . | quote}}
+  ISSUER_URL: {{ printf " " }}{{- include  "DomainManager.keycloakAddr" . | quote}}
+  ISSUER_ALIAS: {{ printf " " }}{{- include  "DomainManager.user-manager.issuerAlias" . | quote}}
+  HAS_AUTH_PREFIX: {{ printf " " }}{{- include  "DomainManager.user-manager.hasAuthPrefix" . | quote}}

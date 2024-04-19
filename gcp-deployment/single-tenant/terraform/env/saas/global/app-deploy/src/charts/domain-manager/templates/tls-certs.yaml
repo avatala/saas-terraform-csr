@@ -1,0 +1,59 @@
+{{- $fullName := include "DomainManager.fullname" . -}}
+{{- if and (.Capabilities.APIVersions.Has "cert-manager.io/v1") .Values.tlsConfig.useCertManager }}
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullName }}-ingress-certificate
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }} 
+spec:
+  commonName: {{ .Values.global.ingress.hosts | first }}
+  dnsNames:
+  {{- range $i, $val := .Values.global.ingress.tls }}
+  {{- range $j, $host := $val.hosts }}
+  - {{ $host }}
+  {{ end -}} 
+  {{ end -}}
+  duration: 8760h
+  issuerRef:
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    name: ipm-ca-issuer
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  renewBefore: 24h
+  {{- with .Values.global.ingress.tls | first }}
+  {{- if  .secretName }}
+  secretName: {{ .secretName }}
+  {{- else }}
+  secretName: {{ include "DomainManager.fullname" $ }}-tls-certs
+  {{- end }}
+  {{- end }}
+  usages:
+    - server auth
+    - client auth
+  privateKey:
+    size: 2048
+{{- end }}
+
+---
+
+{{- if .Values.tlsConfig.loadTLS }}
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  {{- with .Values.global.ingress.tls | first }}
+  {{- if  .secretName }}
+  name: {{ .secretName }}
+  {{- else }}
+  name: {{ include "DomainManager.fullname" $ }}-tls-certs
+  {{- end }}
+  {{- end }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+data:
+  tls.crt: {{ .Files.Get "ssl/tls.crt" | b64enc }}
+  tls.key: {{ .Files.Get "ssl/tls.key" | b64enc }}
+
+---
+{{- end }}

@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: test-turnup-summary
+  labels:
+    grafana_dashboard: "1"
+data:
+  testturn_summary.json: |-
+    {{- $.Files.Get "dashboards/test_turnup_summary.json"  | nindent 4 -}}

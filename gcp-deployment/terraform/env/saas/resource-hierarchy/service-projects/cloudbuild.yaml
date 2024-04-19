@@ -1,0 +1,90 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+    - name: 'gcr.io/cloud-builders/gcloud'
+      id: Generate manifest for deployment
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      entrypoint: sh
+      secretEnv: ['BILLING_ID','FOLDER_ID']
+      args:
+      - '-c'
+      - | 
+        sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  -e "s/BILLING_ACCOUNT_ID/$$BILLING_ID/g"  -e "s/ROOT_FOLDER_ID/$$FOLDER_ID/g" terraform.tfvars.tpl > terraform.tfvars;
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      args:
+        - '-c'
+        - |
+          terraform init
+      id: terraform init
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      args:
+        - '-c'
+        - |
+          terraform fmt
+      id: terraform fmt
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      args:
+        - '-c'
+        - |
+          terraform validate
+      id: terraform validate
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      args:
+        - '-c'
+        - |
+          terraform plan
+      id: terraform plan
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/resource-hierarchy/service-projects
+      args:
+        - '-c'
+        - |
+          terraform apply -input=false -auto-approve
+      id: terraform apply
+      entrypoint: sh 
+
+    - name: 'gcr.io/cloud-builders/gcloud'
+      entrypoint: 'bash'
+      args: 
+        - '-c'
+        - |
+          if [ "${_KMS_KEY_PATH}" = "null" ]; then
+            gcloud alpha builds triggers run service-api-${_PREFIX}-trigger --branch=${_BRANCH_NAME}
+          else
+            gcloud beta services identity create --service=storage.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=bigquery.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=cloudfunctions.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=artifactregistry.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=run.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=eventarc.googleapis.com --project=${_PREFIX}-admin-host
+            gcloud beta services identity create --service=compute.googleapis.com --project=${_PREFIX}-freemium-prj
+            gcloud beta services identity create --service=bigquery.googleapis.com --project=${_PREFIX}-freemium-prj
+            gcloud beta services identity create --service=container.googleapis.com --project=${_PREFIX}-freemium-prj
+            echo "Need to perform some manual steps!!"
+          fi
+      id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/BILLING_ID/versions/latest
+    env: 'BILLING_ID'
+  - versionName: projects/$PROJECT_NUMBER/secrets/FOLDER_ID/versions/latest
+    env: 'FOLDER_ID'

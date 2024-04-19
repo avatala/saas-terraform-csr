@@ -1,0 +1,71 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      sed  -e "s|CMEK_PATH|${_KMS_KEY_PATH}|g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/LOGS_BUCKET_NAME_/${_LOGS_GCS_BUCKET_NAME}/g" -e "s/CUSTOMER_DOMAIN/${_SUB_DOMAIN}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  -e "s/APIGEE__REQUIRED/${_APIGEE_REQUIRED}/g" -e "s/TEMP_SEED_PROJECT_ID_/$PROJECT_ID/g" terraform.tfvars.tpl > terraform.tfvars;
+      sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g"  -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+      
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: cat deployment
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      ls;pwd;cat backend.tf;cat terraform.tfvars;
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    args:
+      - '-c'
+      - |
+        terraform plan  
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/initial-cloud-build
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY    
+timeout: 86400s     
+
+                       

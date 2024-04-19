@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "DomainManager.web-gui.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "DomainManager.labels" . | nindent 4 }}
+      {{- with .Values.web.service.labels }}
+      {{- . | toYaml | nindent 4 }}
+      {{- end }}
+spec:
+  type: {{ .Values.web.service.type | default "ClusterIP" }}
+  ports:
+  - name: web-gui-port
+    port: {{ .Values.web.port | default "8080" }}
+    targetPort: web-gui-port
+  selector:
+   {{- include "DomainManager.web-gui.selectorLabels" . | nindent 4 }}

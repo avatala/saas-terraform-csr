@@ -1,0 +1,206 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.nats
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: nats-client-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-nats"
+  dnsNames:
+  - "{{ .Release.Name }}-nats"
+  - "{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local"
+  - "nats.{{ .Release.Namespace }}.svc.cluster.local"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.postgresql
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: sql-client-tls
+  additionalOutputFormats:
+  - type: CombinedPEM
+  - type: DER
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "dbusername"
+  dnsNames:
+  - "{{ .Release.Name }}-postgresql"
+  - "{{ .Release.Name }}-postgresql-hl"
+  - "{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
+  - "postgresql.{{ .Release.Namespace }}.svc.cluster.local"
+  - "{{ .Release.Name }}-postgresql-hl.{{ .Release.Namespace }}.svc.cluster.local"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.mongodb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: mongodb-client-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-mongodb"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  - "{{ .Release.Name }}-mongodb"
+  - "{{ .Release.Name }}-mongodb-headless"
+  - "{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless"
+  - "{{ .Release.Name }}-mongodb.{{ .Release.Namespace }}.svc.cluster.local"
+  - "{{ .Release.Name }}-mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  - "mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  - "mongodb-0.mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.mqtt
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: mqtt-client-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-mqtt"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  - "{{ .Release.Name }}-emqx"
+  - "{{ .Release.Name }}-emqx-headless"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.temporal-server
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: temporal-server-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-temporal"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  {{- range $i, $val := .Values.global.ingress.tls }}
+  {{- range $j, $host := $val.hosts }}
+  - {{ $host }}
+  {{ end -}}
+  {{ end -}}
+  - "{{ .Release.Name }}-temporal-frontend-headless"
+  - "{{ .Release.Name }}-temporal-frontend-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  - "{{ .Release.Name }}-temporal-frontend"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.temporal-client
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: temporal-client-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-temporal"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  {{- range $i, $val := .Values.global.ingress.tls }}
+  {{- range $j, $host := $val.hosts }}
+  - {{ $host }}
+  {{ end }}
+  {{ end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.otel
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: otel-client-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-otel"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  {{- range $i, $val := .Values.global.ingress.tls }}
+  {{- range $j, $host := $val.hosts }}
+  - {{ $host }}
+  {{ end }}
+  {{ end }}
+  - "obs-opentelemetry-collector.svc.cluster.local"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}.plgd
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "10"
+spec:
+  subject:
+  secretName: ipm-ca-pool
+  isCA: false
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "{{ .Release.Name }}-plgd-ca"
+  ipAddresses:
+  - 127.0.0.1
+  dnsNames:
+  - "{{ .Release.Name }}-mongodb"
+  - "{{ .Release.Name }}-mongodb-headless"
+  - "{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless"
+  - "{{ .Release.Name }}-mongodb.{{ .Release.Namespace }}.svc.cluster.local"
+  - "{{ .Release.Name }}-mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  - "mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  - "mongodb-0.mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local"

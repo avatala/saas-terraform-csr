@@ -1,0 +1,242 @@
+global:
+  ingress:
+    tls:
+    - hosts:
+      - ipm.localhost
+  postgres:
+    postgres_password: aW5maW5lcmEx
+    password: ZGJwYXNzd29yZA==
+    replication_password: ZGJwYXNzd29yZA==  
+replicaCount: 1
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+resources: {}
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# limits:
+#   cpu: 100m
+#   memory: 128Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}
+# -- External mongodb-replica dependency setup
+mongodb:
+  enabled: true
+  fullnameOverride: mongodb
+  architecture: replicaset
+  replicaSetName: rs0
+  replicaCount: 1
+  persistence:
+    enabled: true
+  volumePermissions:
+    enabled: true
+  arbiter:
+    enabled: false
+  auth:
+    enabled: false
+  image:
+    debug: true
+    net:
+      port: 27017
+  tls:
+    enabled: false
+  extraEnvVars:
+    - name: MONGODB_EXTRA_FLAGS
+      value: "--tlsMode=requireTLS --tlsCertificateKeyFile=/certs/cert.pem --tlsCAFile=/certs/ca.pem"
+    - name: MONGODB_CLIENT_EXTRA_FLAGS
+      value: "--tls --tlsCertificateKeyFile=/certs/cert.pem --tlsCAFile=/certs/ca.pem"
+  extraVolumeMounts:
+    - name: mongodb-crt
+      mountPath: "/certs"
+  extraVolumes:
+    - name: mongodb-crt
+      emptyDir: {}
+    - name: mongodb-cm-crt
+      secret:
+        secretName: mongodb-server-tls
+  initContainers:
+    - name: convert-cm-crt
+      image: docker.io/bitnami/nginx:1.20.2-debian-10-r63
+      imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+        - name: mongodb-crt
+          mountPath: "/certs"
+        - name: mongodb-cm-crt
+          mountPath: "/tmp/certs"
+      command:
+        - sh
+        - "-c"
+        - |
+          /bin/bash <<'EOF'
+          cat /tmp/certs/tls.crt >> /certs/cert.pem
+          cat /tmp/certs/tls.key >> /certs/cert.pem
+          cp /tmp/certs/ca.crt  /certs/ca.pem
+          EOF
+    # workaround for https://github.com/bitnami/charts/issues/10264, https://jira.mongodb.org/browse/MONGOSH-1240
+    - name: mongo-binary
+      image: docker.io/bitnami/mongodb:5.0.10-debian-11-r3
+      imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+        - name: mongodb-crt
+          mountPath: "/certs"
+      command:
+        - sh
+        - "-c"
+        - |
+          /bin/bash <<'EOF'
+          cp /opt/bitnami/mongodb/bin/mongo /certs/mongo
+          EOF
+  livenessProbe:
+    enabled: false
+  customLivenessProbe:
+    exec:
+      command:
+        - /certs/mongo
+        - --tls
+        - --tlsCertificateKeyFile=/certs/cert.pem
+        - --tlsCAFile=/certs/ca.pem
+        - --eval
+        - db.adminCommand('ping')
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 10
+    successThreshold: 1
+    failureThreshold: 6
+  readinessProbe:
+    enabled: false
+  customReadinessProbe:
+    exec:
+      command:
+        - bash
+        - -ec
+        - |
+          TLS_OPTIONS='--tls --tlsCertificateKeyFile=/certs/cert.pem --tlsCAFile=/certs/ca.pem'
+          /certs/mongo $TLS_OPTIONS --eval 'db.hello().isWritablePrimary || db.hello().secondary' | grep -q 'true'
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 10
+    successThreshold: 1
+    failureThreshold: 6
+# -- External nats dependency setup
+nats:
+  natsbox:
+    enabled: false
+  nats:
+    enabled: true
+    tls:
+      secret:
+        name: nats-server-tls
+      ca: "ca.crt"
+      cert: "tls.crt"
+      key: "tls.key"    
+    jetstream:
+      enabled: true
+      memStorage:
+        enabled: true
+        size: 2Gi
+    leafnodes:
+      enabled: false
+      noAdvertise: false
+    natsbox:
+      enabled: false
+  mqtt:
+    enabled: true
+    ackWait: 1m
+    maxAckPending: 100
+    port: 1883
+    authorization:
+      username: admin
+      password: admin
+# -- External postgresqldependency setup
+postgresql:
+  tls:
+    enabled: true
+    certificatesSecret: sql-server-tls
+    certFilename: "tls.crt"
+    certKeyFilename: "tls.key"
+    certCAFilename: "ca.crt"
+  auth:
+    existingSecret: ipm-postgresql-secret
+    secretKeys:
+      adminPasswordKey: postgres_password
+      userPasswordKey: password
+      replicationPasswordKey: replication_password
+    username: dbusername
+    database: keycloak
+  # global:
+  #   storageClass: local-storage-postgres
+  volumePermissions:
+    enabled: true
+
+emqx:
+  extraVolumeMounts: 
+    - name: mqtt-tls-cfg
+      mountPath: /certs
+  extraVolumes:
+    - name: mqtt-tls-cfg
+      secret: 
+        secretName: mqtt-server-tls
+  emqxConfig: 
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE: /certs/tls.key
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE: /certs/tls.crt
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CACERTFILE: /certs/ca.crt
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__FAIL_IF_NO_PEER_CERT: true
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__VERIFY: verify_peer
+    EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__VERSIONS: ["tlsv1.2","tlsv1.3"]

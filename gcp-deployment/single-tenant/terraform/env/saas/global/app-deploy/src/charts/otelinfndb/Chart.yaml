@@ -1,0 +1,39 @@
+apiVersion: v2
+name: otelinfndb
+description: Infinera/Telemetry with Grafana dashboards chart for Kubernetes
+version: v1.2.4
+appVersion: v1.2.4
+keywords:
+  - opentelemetry
+  - otelinfncol
+  - dashboards
+dependencies:
+  - name: collector
+    version: "0.14.0"
+    repository: "oci://ghcr.io/infinera/gcp-ipm-charts"
+    condition: collector.enabled
+    tags:
+      - ipm
+      - collector
+      - opentelemetry   
+  - name: grafana
+    version: "6.59.4"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+    tags:
+      - grafana
+      - opentelemetry
+      - monitoring
+      - dashboards
+  - name: xripm-int
+    version: "0.14.1"
+    repository: "oci://ghcr.io/infinera/gcp-ipm-charts"
+    condition: xripm-int.enabled
+    tags:
+      - xripm
+      - integration
+      - opentelemetry        
+maintainers:
+  - name: Madhav Kothapalli
+    email: mkothapalli@infinera.com
+deprecated: false

@@ -1,0 +1,7 @@
+curl -X POST https://FUNCTION_URI \
+-H "Authorization: bearer $(gcloud auth print-identity-token)" \
+-H "Content-Type: application/json" \
+-d '{
+    "operation": "deleteTenant",
+    "tenantId": "CUSTOMER_NAME"
+}'

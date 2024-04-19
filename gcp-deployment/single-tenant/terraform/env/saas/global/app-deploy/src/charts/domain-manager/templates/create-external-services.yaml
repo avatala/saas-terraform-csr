@@ -1,0 +1,80 @@
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-postgresql") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: inf-postgresql.{{ .Values.namespace_inf }}.svc.cluster.local
+{{- end }}
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-nats") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-nats
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: inf-nats.{{ .Values.namespace_inf }}.svc.cluster.local
+{{- end }}
+
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-mongodb") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-mongodb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: mongodb-headless.{{ .Values.namespace_inf }}.svc.cluster.local
+{{- end }}
+
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-emqx") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-emqx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: inf-emqx.{{ .Values.namespace_inf }}.svc.cluster.local
+{{- end }}
+
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-keycloak") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-keycloak
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: keycloak-keycloakx-http.{{ .Values.namespace_keycloak }}.svc.cluster.local
+{{- end }}
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-oauth2-proxy") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-oauth2-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: keycloak-oauth2-proxy.{{ .Values.namespace_keycloak }}.svc.cluster.local
+{{- end }}

@@ -1,0 +1,151 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_APIGEE=${_APIGEE}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout ${_BRANCH_NAME}
+      if [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE}" = "false"  ]; then
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+        sh script.sh
+        rm -rf script.sh
+      elif [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE}" = "true"  ]; then
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+        sh appigee.sh
+        rm -rf appigee.sh
+      else
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script-tcp.sh.tpl > script-tcp.sh;
+        sh script-tcp.sh
+        rm -rf script-tcp.sh
+      fi
+    secretEnv: ['_CLOUD_FUNCTION_URI']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory secret manager
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "${_CUSTOMER_EMAIL}"
+        git config --global user.name "${_CUSTOMER_NAME}"
+        git commit -m "client ${_CUSTOMER_NAME}'s secret manager deleted"
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+
+  - name: "${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest"
+    entrypoint: "bash"
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_CUSTOMER_EMAIL=${_CUSTOMER_EMAIL}"
+      - "_REGION=${_REGION}"
+      - "_CSR_TERRAFORM_REPO_NAME=${_CSR_TERRAFORM_REPO_NAME}"
+      - "_TF_STATE_BUCKET_NAME=${_TF_STATE_BUCKET_NAME}"
+      - "_LOG_BUCKET_NAME=${_LOG_BUCKET_NAME}"
+      - "_CSR_APP_REPO_NAME=${_CSR_APP_REPO_NAME}"
+      - "_PREFIX=${_PREFIX}"
+      - "_SEED_PROJECT_ID=${_SEED_PROJECT_ID}"
+      - "_ENTERPRISE_PROJECT_ID=${_ENTERPRISE_PROJECT_ID}"
+      - "_ENTERPRISE_FOLDER_NAME=${_ENTERPRISE_FOLDER_NAME}"
+      - "_BRANCH_NAME=${_BRANCH_NAME}"
+      - "_TENANT_ID=${_TENANT_ID}"
+      - "_MASTER_IP=${_MASTER_IP}"
+      - "_SUBNET_IP=${_SUBNET_IP}"
+      - "_POD_RANGE=${_POD_RANGE}"
+      - "_SVC_RANGE=${_SVC_RANGE}"
+      - "_MACHINE_TYPE=${_MACHINE_TYPE}"
+      - "_ZONE=${_ZONE}"
+      - "_MIN_COUNT=${_MIN_COUNT}"
+      - "_MAX_COUNT=${_MAX_COUNT}"
+      - "_NODE_COUNT=${_NODE_COUNT}"
+      - "_ORG_LOGO_URL=${_ORG_LOGO_URL}"
+      - "_TENANT_DOMAIN=${_TENANT_DOMAIN}"
+      - "_KMS_KEY_PATH=${_KMS_KEY_PATH}"
+    args:
+      - "-eEuo"
+      - "pipefail"
+      - "-c"
+      - |-
+        git config --global user.email "${_CUSTOMER_EMAIL}"
+        git config --global user.name "${_CUSTOMER_NAME}"
+        mkdir -p gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager/
+        envsubst < gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager/terraform.tfvars
+        envsubst < gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template/backend.tf > gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager/backend.tf
+        for f in $(find gcp-deployment/single-tenant/terraform/env/saas/global/secret-manager-template -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager/$(basename $f)"; done
+        git add .
+        git commit -m "client ${_CUSTOMER_NAME}'s secret manager created"
+        git push --set-upstream origin ${_BRANCH_NAME}
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - "-c"
+      - |
+        terraform init
+    id: terraform secret manager init
+    entrypoint: sh
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - "-c"
+      - |
+        terraform fmt
+    id: terraform secret manager fmt
+    entrypoint: sh
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - "-c"
+      - |
+        terraform validate
+    id: terraform secret manager validate
+    entrypoint: sh
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - "-c"
+      - |
+        terraform plan
+    id: terraform secret manager plan
+    entrypoint: sh
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - "-c"
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform secret manager apply
+    entrypoint: sh
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', '${_CUSTOMER_NAME}-single-tenant-service-folder-saas-trigger', '--branch=${_BRANCH_NAME}', '--region=${_REGION}']
+    id: 'trigger next build'
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+    
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY

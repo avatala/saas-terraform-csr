@@ -1,0 +1,164 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout ${_BRANCH_NAME}
+      sed -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/REGION/$$_PRE_REQ_REGION/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+      sh appigee.sh
+      rm -rf appigee.sh
+    secretEnv: ['_CLOUD_FUNCTION_URI', '_PRE_REQ_REGION']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "${_CUSTOMER_EMAIL}"
+        git config --global user.name "${_CUSTOMER_NAME}"
+        git commit -m "client ${_CUSTOMER_NAME}'s Apigee Components deleted"
+        git pull --set-upstream origin ${_BRANCH_NAME}
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_LOG_BUCKET_NAME=${_LOG_BUCKET_NAME}"
+      - "_PREFIX=${_PREFIX}"
+      - "_TF_STATE_BUCKET_NAME=${_TF_STATE_BUCKET_NAME}"
+      - "_TEMP_SEED_PROJECT_ID=${_SEED_PROJECT_ID}"
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_CUSTOMER_EMAIL=${_CUSTOMER_EMAIL}"
+      - "_REGION=${_REGION}"
+      - "_TENANT_ID=${_TENANT_ID}"
+      - "_ENTERPRISE_PROJECT_ID=${_ENTERPRISE_PROJECT_ID}"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git config --global user.email "${_CUSTOMER_EMAIL}"
+      git config --global user.name "${_CUSTOMER_NAME}"
+      mkdir -p gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/terraform.tfvars
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/apigee-app.sh > gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/apigee-app.sh
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/apigee-kvm-delete.sh > gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/apigee-kvm-delete.sh
+      sed -e "s/HOST_PROJECT/$$HOST_PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/CUSTOMER_EMAIL/${_CUSTOMER_EMAIL}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/ENTERPRISE_SUB_DOMAIN/$$_ENTERPRISE_SUB_DOMAIN/g" -e "s/FULL_ADMIN_DOMAIN/$$ADMIN_DOMAIN/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/apigee-creds-mail.sh.tpl > gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/apigee-creds-mail.sh
+      for f in $(find gcp-deployment/single-tenant/terraform/env/saas/regions/apigee-components/ -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components/$(basename $f)"; done
+      git add .
+      git commit -m "client ${_CUSTOMER_NAME}'s Apigee Components Created"
+      git pull --set-upstream origin ${_BRANCH_NAME}
+      git push --set-upstream origin ${_BRANCH_NAME}
+    secretEnv: ['HOST_PROJECT_ID','ADMIN_DOMAIN','_CLOUD_FUNCTION_URI','_ENTERPRISE_SUB_DOMAIN']
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    id: Apigee dev app & KVM configuration
+    args:
+      - '-c'
+      - |
+        bash apigee-app.sh
+    entrypoint: bash
+    secretEnv: ['HOST_PROJECT_ID']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: sending apigee creds detail mail to user
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+    args:
+      - '-c'
+      - |
+        bash apigee-creds-mail.sh
+    entrypoint: bash
+    secretEnv: ['HOST_PROJECT_ID','_CLOUD_FUNCTION_URI','ADMIN_DOMAIN','_ENTERPRISE_SUB_DOMAIN']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_HOST_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ADMIN_DOMAIN/versions/latest
+    env: 'ADMIN_DOMAIN'
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: _ENTERPRISE_SUB_DOMAIN
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PRE_REQ_REGION/versions/latest
+    env: _PRE_REQ_REGION
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+  workerPool:
+    'projects/${_PREFIX}-anthos-hub/locations/${_PRE_REQ_REGION}/workerPools/${_PREFIX}-private-worker-pool'

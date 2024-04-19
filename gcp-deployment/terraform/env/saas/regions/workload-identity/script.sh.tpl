@@ -1,0 +1,37 @@
+curl -X POST https://FUNCTION_URI \
+-H "Authorization: bearer $(gcloud auth print-identity-token)" \
+-H "Content-Type: application/json" \
+-d '{ "operation": "initVendor",  
+  "defaultVendorEmail": "VENDOR__EMAIL__ID", 
+  "defaultVendorName": "Default Vendor", 
+  "defaultVendorOrgName": "org",
+  "landingPageDataStudioUrl": "https://lookerstudio.google.com/embed/reporting/5ae65b22-bf6c-42f5-970b-4b1e6b2d97c1/page/bLKZ",
+  "costDataStudioUrl": "https://lookerstudio.google.com/embed/reporting/3ce4c53c-2e9b-47c1-ba44-fae85ff83f8e/page/bLKZ".
+  "usageDataStudioUrl": "https://lookerstudio.google.com/embed/reporting/8e1ac0b4-1827-46b4-961c-fdb5c274c8f6/page/p_dcr2aqm33c",
+  "cloudBuildProjectId": "TEMP_SEED_PROJECT_ID_", 
+  "freemiumCloudBuildTrigger": "FREEMIUM__TRIGGER__ID", 
+  "freemiumCloudBuildRepoName": "APP_REPO_NAME_", 
+  "freemiumCloudBuildBranchName": "REPO_BRANCH_NAME", 
+  "freemiumCloudBuildProjectLocation": "FREEMIUM__TRIGGER__LOCATION", 
+  "enterpriseCloudBuildTrigger": "ENTERPRISE__TRIGGER__ID", 
+  "enterpriseCloudBuildRepoName": "CODE_REPOSITORY_NAME",
+  "enterpriseCloudBuildBranchName": "REPO_BRANCH_NAME", 
+  "enterpriseCloudBuildProjectLocation": "ENTERPRISE__TRIGGER__LOCATION", 
+  "deleteFreemiumCloudBuildTrigger": "FREEMIUM__DELETE__TRIGGER__ID", 
+  "deleteFreemiumCloudBuildProjectLocation": "FREEMIUM__DELETE__TRIGGER__LOCATION", 
+  "deleteFreemiumCloudBuildRepoName": "APP_REPO_NAME_", 
+  "deleteFreemiumCloudBuildBranchName": "REPO_BRANCH_NAME", 
+  "deleteEnterpriseCloudBuildTrigger": "ENTERPRISE__DELETE__TRIGGER__ID", 
+  "deleteEnterpriseCloudBuildProjectLocation": "ENTERPRISE__DELETE__TRIGGER__LOCATION", 
+  "deleteEnterpriseCloudBuildRepoName": "CODE_REPOSITORY_NAME", 
+  "deleteEnterpriseCloudBuildBranchName": "REPO_BRANCH_NAME", 
+  "freemiumSubdomain": "FREEMIUM__SUB__DOMAIN", 
+  "enterpriseSubdomain": "ENTERPRISE__SUB__DOMAIN",
+  "asmDashboardUrl": "https://console.cloud.google.com/anthos?project=ANTHOS_PROJECT",
+  "logMonDashboardUrl": "https://console.cloud.google.com/monitoring/dashboards?project=HOST_PROJECT&pageState=(%22dashboards%22:(%22t%22:%22Custom%22))",
+  "updateFreemiumCloudBuildProjectLocation": "FREEMIUM_UPDATE_LOC",
+  "updateFreemiumCloudBuildTrigger": "FREEMIUM_UPDATE_ID",
+  "idpEnterpriseCloudBuildTriggerlocation": "ENTERPRISE_IDP_LOC",
+  "idpEnterpriseCloudBuildTrigger": "ENTERPRISE_IDP_ID",
+  "freemiumProjectId": "FREEMIUM__PRJ__ID"
+  }'

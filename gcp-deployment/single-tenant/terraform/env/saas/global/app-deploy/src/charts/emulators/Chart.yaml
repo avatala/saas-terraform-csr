@@ -1,0 +1,15 @@
+apiVersion: v2
+name: emulators
+description: A Helm chart for Kubernetes to deploy XR/NDU emulators
+version: v1.2.4
+appVersion: "v1.2.4"
+type: application
+keywords:
+  - "ipm"
+  - "xr-emulator"
+  - "ndu-emulator"
+dependencies: [] 
+maintainers:
+  - name: Madhav Kothapalli
+    email: mkothapalli@infinera.com    
+deprecated: false

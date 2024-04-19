@@ -1,0 +1,115 @@
+{{- if or .Values.useSelfSignedIssuer .Values.useGoogleCASIssuer }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ipm-ca
+  labels:
+    {{- include "cert-manager.labels" . | nindent 4 }}  
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "6"
+spec:
+  isCA: true
+  subject:
+    organizations:
+    {{- range .Values.cacert.subject.organizations }}
+    - {{ . | quote }}
+    {{- end }}        
+    countries:
+    {{- range .Values.cacert.subject.countries }}
+    - {{ . | quote }}
+    {{- end }}   
+    organizationalUnits:
+    {{- range .Values.cacert.subject.organizationalUnits }}
+    - {{ . | quote }}
+    {{- end }}  
+    localities:
+    {{- range .Values.cacert.subject.localities }}
+    - {{ . | quote }}
+    {{- end }}     
+    provinces:
+    {{- range .Values.cacert.subject.provinces }}
+    - {{ . | quote }}
+    {{- end }}   
+  commonName: {{ .Values.cacert.commonName | quote }}
+  dnsNames:
+    {{- range .Values.cacert.dnsNames }}
+    - {{ . | quote }}
+    {{- end }}  
+  duration: 8760h # 1 year
+  renewBefore: 240h # 10 days
+  secretName: ipm-ca-tls
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth    
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:  
+    name: {{ if .Values.useGoogleCASIssuer }}ipm-ca-issuer{{ else }}selfsigned-issuer{{ end }}
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+{{- end }}
+
+{{- if and .Values.useSelfSignedIssuer (not .Values.useGoogleCASIssuer) }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ipm-ca-issuer
+  labels:
+    {{- include "cert-manager.labels" . | nindent 4 }}  
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "7"  
+spec:
+  ca:
+    secretName: ipm-ca-tls
+{{- end }}
+
+{{- if and .Values.useGoogleCASIssuer (not .Values.useSelfSignedIssuer) }}
+---
+apiVersion: cas-issuer.jetstack.io/v1beta1
+kind: GoogleCASClusterIssuer
+metadata:
+  name: ipm-ca-issuer
+  namespace: cert-manager
+spec:
+  project: inp-freemium-prj
+  location: us-west2
+  caPoolId: xr-gcas-pool
+{{- end }}
+
+{{- if .Values.externalCA }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ipm-ca-issuer
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "7"
+spec:
+  ca:
+    secretName: ipm-ca-tls
+{{- end }}
+
+{{- if .Values.externalCA }}
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: ipm-ca-tls
+  labels:
+    {{- include "cert-manager.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "6"
+data:
+  tls.crt: {{ .Files.Get "ssl/ca.crt" | b64enc }}
+  tls.key: {{ .Files.Get "ssl/ca.key" | b64enc }}
+{{- end }}

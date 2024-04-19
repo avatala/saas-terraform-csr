@@ -1,0 +1,188 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/github_repo/webhook-trigger/
+    id: Application version bump
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      branch=`echo ${_REF} | cut -d "/" -f3`
+      if [[ $branch == "prod" ]]; then
+        export GH_TOKEN=$$github_token
+        gh auth login
+            
+        if (gh api repos/$$github_org/${_REPO}/releases/latest &> /dev/null); then
+          remote_tag=$(gh api repos/$$github_org/${_REPO}/releases/latest --jq '.tag_name')
+          local_tag=$remote_tag
+        else
+          remote_tag=""
+          local_tag=v1.0.0
+        fi
+
+        version_bump() {
+          local_tag=$local_tag
+          local_tag=$(echo $local_tag | sed 's/^v//')
+
+          IFS="." read version minor patch <<< "$local_tag";
+
+          case "$1" in
+          patch) local_tag="v$version.$minor.$((patch+1))"; ;;
+          major) local_tag="v$((version+1)).0.0"; ;;
+          minor) local_tag="v$version.$((minor+1)).0"; ;;
+          *)     local_tag="v$version.$minor.$patch"; ;;
+          esac
+                          
+          echo $local_tag
+        }
+
+        commit_msg=$(echo "$_COMMIT_MSG" | tr '[:upper:]' '[:lower:]')
+
+        if [[ $commit_msg == *"major"* ]]; then
+          local_tag=$(version_bump major)
+        elif [[ $commit_msg == *"minor"* ]]; then
+          local_tag=$(version_bump minor)
+        elif [[ $commit_msg == *"patch"* ]]; then
+          local_tag=$(version_bump patch)
+        else
+          echo "version bump is not provided as instruction in the commit message"
+        fi
+
+        if [[ $(gcloud secrets list | grep "$${_CUSTOMER_NAME}_APP_VERSION") ]]; then 
+          echo "$${_CUSTOMER_NAME}_APP_VERSION secret already exists"
+        else
+          if [ "${_KMS_KEY_PATH}" = "null" ]; then 
+            gcloud secrets create "$${_CUSTOMER_NAME}_APP_VERSION"
+          else
+            sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s|KMS_KEY|${_KMS_KEY_PATH}|g" replication-policy.json.tpl > replication-policy.json;
+            gcloud secrets create $${_CUSTOMER_NAME}_APP_VERSION --project $PROJECT_ID  --replication-policy-file ./replication-policy.json
+          fi
+        fi
+              
+        if [[ $remote_tag != $local_tag ]]; then
+          printf "$local_tag" | gcloud secrets versions add "$${_CUSTOMER_NAME}_APP_VERSION" --data-file=-
+        else
+          echo "remote tag $remote_tag already exists"
+        fi
+      else
+        echo "branch $branch not authorized"
+      fi
+    secretEnv: ["github_org","github_token","_CUSTOMER_NAME","_CUSTOMER_REGION"]
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/github_repo/webhook-trigger/
+    id: update tenant app version in firestore
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      branch=`echo ${_REF} | cut -d "/" -f3`
+      if [[ $branch == "prod" ]]; then
+        export GH_TOKEN=$$github_token
+        gh auth login
+
+        if (gh api repos/$$github_org/${_REPO}/releases/latest &> /dev/null); then
+          remote_tag=$(gh api repos/$$github_org/${_REPO}/releases/latest --jq '.tag_name')
+        else
+          remote_tag=""
+        fi
+
+        if [[ $remote_tag != $$APP_VERSION ]]; then
+          sed -e "s/CLOUD_FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" -e "s/TENANT_ID/$$_CUSTOMER_NAME/g" -e "s/APP_VERSION/$$APP_VERSION/g" cf-script.sh.tpl > cf-script.sh
+          bash cf-script.sh
+        else
+          echo "remote tag $$APP_VERSION already exists"
+        fi
+      else
+        echo "branch $branch not authorized"
+      fi
+    secretEnv: ["github_org","github_token","_CUSTOMER_NAME","APP_VERSION","_CLOUD_FUNCTION_URI"]
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: create cloud deploy release
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      branch=`echo ${_REF} | cut -d "/" -f3`
+      if [[ $branch == "prod" ]]; then
+        git clone https://$$github_user:$$github_token@github.com/$$github_org/${_REPO}
+        cd ${_REPO}
+        git checkout $branch
+        commit_msg=$(echo "$_COMMIT_MSG" | tr '[:upper:]' '[:lower:]')
+
+        if [[ $commit_msg == *"replace"* ]]; then
+          gcloud container clusters get-credentials $$_CUSTOMER_NAME-saas-tenant-cluster-us-ct1-01 --region $$_CUSTOMER_REGION --project $$_ENTERPRISE_PROJECT_ID
+          kubectl delete ns $$_CUSTOMER_NAME
+          gcloud deploy releases create "saas-release-$$_CUSTOMER_NAME-$(date '+%Y%m%d%H%M%S')" --project=$$_ENTERPRISE_PROJECT_ID --region=$$_CUSTOMER_REGION --skaffold-file=config/skaffold.yaml --delivery-pipeline=saas-delivery-pipeline-$$_CUSTOMER_NAME --skaffold-version=skaffold_preview
+          sleep 300
+          gcloud dns record-sets update $${_CUSTOMER_NAME}.$${_ENTERPRISE_SUB_DOMAIN} --rrdatas=$(kubectl get svc frontend -n $${_CUSTOMER_NAME}  -o jsonpath="{.status.loadBalancer.ingress[0].ip}") --type=A --ttl=300 --zone=${_PREFIX}-enterprise-private-zone --project $$HOST_PROJECT_ID
+        else
+          gcloud deploy releases create "saas-release-$$_CUSTOMER_NAME-$(date '+%Y%m%d%H%M%S')" --project=$$_ENTERPRISE_PROJECT_ID --region=$$_CUSTOMER_REGION --skaffold-file=config/skaffold.yaml --delivery-pipeline=saas-delivery-pipeline-$$_CUSTOMER_NAME --skaffold-version=skaffold_preview
+        fi
+      else
+       echo "branch $branch not authorized"
+      fi
+    secretEnv: ["github_user","github_token","github_org","_ENTERPRISE_PROJECT_ID","_CUSTOMER_NAME","APP_VERSION","_CUSTOMER_REGION","_ENTERPRISE_SUB_DOMAIN","HOST_PROJECT_ID"]
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: create new github release
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      branch=`echo ${_REF} | cut -d "/" -f3`
+      if [[ $branch == "prod" ]]; then
+        export GH_TOKEN=$$github_token
+        gh auth login
+
+        if (gh api repos/$$github_org/${_REPO}/releases/latest &> /dev/null); then
+          remote_tag=$(gh api repos/$$github_org/${_REPO}/releases/latest --jq '.tag_name')
+        else
+          remote_tag=""
+        fi
+
+        if [[ $remote_tag != $$APP_VERSION ]]; then
+          gh release create $$APP_VERSION --notes "$$APP_VERSION release" --repo $$github_org/${_REPO} --target prod
+        else
+          echo "remote tag $$APP_VERSION already exists"
+        fi
+      else
+        echo "branch $branch not authorized"
+      fi
+    secretEnv: ["github_org","github_token","APP_VERSION"]
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/GITHUB-USERNAME/versions/latest
+    env: github_user
+  - versionName: projects/$PROJECT_ID/secrets/GITHUB-TOKEN/versions/latest
+    env: github_token
+  - versionName: projects/$PROJECT_ID/secrets/GITHUB-ORG/versions/latest
+    env: github_org
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-ENTERPRISE_PROJECT_ID/versions/latest
+    env: _ENTERPRISE_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}_APP_VERSION/versions/latest
+    env: APP_VERSION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: _ENTERPRISE_SUB_DOMAIN
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_HOST_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+  pool:
+    name: 'projects/${_PREFIX}-anthos-hub/locations/${_PRE_REQ_REGION}/workerPools/${_PREFIX}-private-worker-pool'
+timeout: 86400s

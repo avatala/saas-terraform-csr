@@ -1,0 +1,9 @@
+dependencies:
+- name: plgd-hub
+  repository: https://charts.plgd.dev
+  version: 2.15.0
+- name: plgd-dps
+  repository: https://charts.plgd.dev
+  version: 0.12.0
+digest: sha256:6981f52eee5f719c348b39a2e0501b290ca0bff7024882ac0362d517559413f7
+generated: "2023-12-10T08:54:44.282561614-08:00"

@@ -1,0 +1,808 @@
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+  postgres:
+    postgres_password: aW5maW5lcmEx
+    password: ZGJwYXNzd29yZA==
+    replication_password: ZGJwYXNzd29yZA==     
+  keycloak:
+    hosts:
+      - ipm.localhost
+  ingress:
+    hosts:
+      - ipm.localhost
+    tls:
+      - hosts:
+        - ipm.localhost
+    ingressClassName: nginx
+  images:
+    initContainers:
+      busybox:
+      natsbox:
+  # -- extra volumes for generic clients such as open telemetry
+  extraVolumes:
+  # -- extra volumes mounts for generic clients such as open telemetry
+  extraVolumeMounts:
+  clients:
+    openTelemetry:
+      # -- (string) uri for OpenTelemetry collector
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool:
+        # -- client private key in PEM format
+        keyFile:
+        # -- client public certificate in PEM format
+        certFile:
+# Default values for aggregation-manager.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+replicaCount: 1
+image:
+  registry: "registry.docker.io"
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.23.1"
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+hostIp: ""
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+cluster:
+  # -- Cluster internal DNS prefix
+  dns: cluster.local
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+ingress:
+  enabled: false
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+resources: {}
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# limits:
+#   cpu: 100m
+#   memory: 128Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+plgd-hub:
+  global:
+    domain: "ipm.localhost"
+    apiDomain: "ipm.localhost"
+    hubId: "00000000-0000-0000-0000-000000000001"
+    ownerClaim: "owner-id"
+    enableWildCartCert: false
+    authority: "http://inf-keycloak/realms/xr-cm"
+    oauth:
+      device:
+        - name: "plgd.dps"
+          clientID: "xr-plgd-client"
+          clientSecret: "xr-plgd-client"
+          grantType: "clientCredentials"
+          redirectURL: "https://ipm.localhost/things"
+          useInUi: true
+      web:
+        clientID: "xr-plgd-ui"
+        scopes: [openid]
+    mongoUri: mongodb://inf-mongodb:27017
+    natsUri: nats://inf-nats:4222
+  certificateauthority:
+    domain: "ipm.localhost"
+    ingress:
+      http:
+        annotations:
+          kubernetes.io/ingress.class: nginx
+      grpc:
+        annotations:
+          kubernetes.io/ingress.class: nginx
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+    extraVolumeMounts:
+      - name: mongodb-tls-cfg
+        mountPath: /certs/mongodb
+    extraVolumes:
+      - name: mongodb-tls-cfg
+        secret:
+          secretName: mongodb-client-tls
+    clients:
+      storage:
+        mongoDB:
+          uri: mongodb://inf-mongodb:27017
+          tls:
+            caPool: "/certs/mongodb/ca.crt"
+            keyFile: "/certs/mongodb/tls.key"
+            certFile: "/certs/mongodb/tls.crt"
+  coapgateway:
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+      dumpBody: true
+    service:
+      type: NodePort
+      nodePort: 25684
+    extraVolumeMounts:
+      - name: nats-tls-cfg
+        mountPath: /certs/nats
+    extraVolumes:
+      - name: nats-tls-cfg
+        secret:
+          secretName: nats-client-tls
+    clients:
+      eventBus:
+        nats:
+          jetstream: true
+          url: nats://inf-nats:4222
+          tls:
+            caPool: "/certs/nats/ca.crt"
+            keyFile: "/certs/nats/tls.key"
+            certFile: "/certs/nats/tls.crt" 
+  grpcgateway:
+    domain: "ipm.localhost"
+    ingress:
+      annotations:
+        kubernetes.io/ingress.class: nginx
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+      dumpBody: true
+    extraVolumeMounts:
+      - name: nats-tls-cfg
+        mountPath: /certs/nats
+    extraVolumes:
+      - name: nats-tls-cfg
+        secret:
+          secretName: nats-client-tls
+    clients:
+      eventBus:
+        nats:
+          jetstream: true
+          url: nats://inf-nats:4222
+          tls:
+            caPool: "/certs/nats/ca.crt"
+            keyFile: "/certs/nats/tls.key"
+            certFile: "/certs/nats/tls.crt"
+  httpgateway:
+    enabled: false
+    image:
+      pullPolicy: IfNotPresent
+    uiDomain: "ipm.localhost"          
+    ingress:
+      api:
+        annotations:
+          kubernetes.io/ingress.class: nginx
+      ui:
+        enabled: true
+        annotations:
+          kubernetes.io/ingress.class: nginx
+  mockoauthserver:
+    enabled: false
+  mongodb:
+    enabled: false    
+  nats:
+    enabled: false
+  resourceaggregate:
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+      dumpBody: true
+    extraVolumeMounts:
+      - name: mongodb-tls-cfg
+        mountPath: /certs/mongodb
+      - name: nats-tls-cfg
+        mountPath: /certs/nats
+    extraVolumes:
+      - name: mongodb-tls-cfg
+        secret:
+          secretName: mongodb-client-tls
+      - name: nats-tls-cfg
+        secret:
+          secretName: nats-client-tls
+    clients:
+      eventBus:
+        nats:
+          jetstream: true
+          url: nats://inf-nats:4222
+          tls:
+            caPool: "/certs/nats/ca.crt"
+            keyFile: "/certs/nats/tls.key"
+            certFile: "/certs/nats/tls.crt"
+      eventStore:
+        mongoDB:
+          uri: mongodb://inf-mongodb:27017
+          tls:
+            caPool: "/certs/mongodb/ca.crt"
+            keyFile: "/certs/mongodb/tls.key"
+            certFile: "/certs/mongodb/tls.crt"
+  resourcedirectory:
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+    extraVolumeMounts:
+      - name: mongodb-tls-cfg
+        mountPath: /certs/mongodb
+      - name: nats-tls-cfg
+        mountPath: /certs/nats
+    extraVolumes:
+      - name: mongodb-tls-cfg
+        secret:
+          secretName: mongodb-client-tls
+      - name: nats-tls-cfg
+        secret:
+          secretName: nats-client-tls
+    clients:
+      eventBus:
+        nats:
+          url: nats://inf-nats:4222
+          tls:
+            caPool: "/certs/nats/ca.crt"
+            keyFile: "/certs/nats/tls.key"
+            certFile: "/certs/nats/tls.crt"
+      eventStore:
+        mongoDB:
+          uri: mongodb://inf-mongodb:27017
+          tls:
+            caPool: "/certs/mongodb/ca.crt"
+            keyFile: "/certs/mongodb/tls.key"
+            certFile: "/certs/mongodb/tls.crt"
+    publicConfiguration:
+      authority: "https://ipm.localhost/realms/xr-cm"    
+  publicConfiguration:
+  #caPool: "/secrets/public/rootca.crt"            
+  identitystore:
+    image:
+      pullPolicy: IfNotPresent
+    log:
+      level: debug
+    extraVolumeMounts:
+      - name: mongodb-tls-cfg
+        mountPath: /certs/mongodb
+      - name: nats-tls-cfg
+        mountPath: /certs/nats
+    extraVolumes:
+      - name: mongodb-tls-cfg
+        secret:
+          secretName: mongodb-client-tls
+      - name: nats-tls-cfg
+        secret:
+          secretName: nats-client-tls
+    clients:
+      eventBus:
+        nats:
+          jetstream: true
+          url: nats://inf-nats:4222
+          tls:
+            caPool: "/certs/nats/ca.crt"
+            keyFile: "/certs/nats/tls.key"
+            certFile: "/certs/nats/tls.crt"
+      storage:
+        mongoDB:
+          uri: mongodb://inf-mongodb:27017
+          tls:
+            caPool: "/certs/mongodb/ca.crt"
+            keyFile: "/certs/mongodb/tls.key"
+            certFile: "/certs/mongodb/tls.crt"
+  extraAuthorizationCAPool:
+    name: ipm-ca-pool
+    mountPath: /certs/extra
+    fileName: tls.crt 
+  certmanager:
+    default:
+      ca: 
+        enabled: true  
+    external:
+      issuer:
+        name: "ipm-ca-issuer"
+        kind: "ClusterIssuer"    
+        group: "cert-manager.io"
+plgd-dps:
+  global:
+    domain: "ipm.localhost"
+    apiDomain: "ipm.localhost"
+    hubId: "00000000-0000-0000-0000-000000000001"
+    ownerClaim: "owner-id"
+    enableWildCartCert: false
+    authority: "http://inf-keycloak/realms/xr-cm"
+    oauth:
+      device:
+        - name: "plgd.dps"
+          clientID: "xr-plgd-client"
+          clientSecret: "xr-plgd-client"
+          grantType: "clientCredentials"
+          redirectURL: "https://ipm.localhost/things"
+          useInUi: true
+      web:
+        clientID: "xr-plgd-ui"
+        scopes: [openid]
+    name: dps-authorization-ca-pool
+  extraAuthorizationCAPool:
+    name: ipm-ca-pool
+    mountPath: /certs/extra
+    fileName: tls.crt
+  certmanager:
+    default:
+      ca: 
+        enabled: true  
+    external:
+      issuer:
+        name: "ipm-ca-issuer"
+        kind: "ClusterIssuer"
+        group: "cert-manager.io"   
+  deviceProvisioningService:
+    service:
+      type: NodePort
+      nodePort: 5684
+    image:
+      registry: ghcr.io/infinera/
+      repository: ipm/dps
+      tag: 0.12.0
+      pullPolicy: IfNotPresent
+      imagePullSecrets: 
+      - name: "infn-registry"
+    enrollmentGroups:
+      - id: "31ce0f0c-c414-4f17-8dbd-9aab4ba6c296"
+        owner: "ipm-plgd-claim"
+        attestationMechanism:
+          x509:
+            certificateChain: |-
+              -----BEGIN CERTIFICATE-----
+              MIICdzCCAf2gAwIBAgIUKLjkGo8+Vx9Kcp7dDOB1i9NDt7wwCgYIKoZIzj0EAwIw
+              aTEZMBcGA1UEAwwQR1hST09ULTM4NC1Qcm9kMTEMMAoGA1UECwwDUEtJMREwDwYD
+              VQQKDAhJbmZpbmVyYTERMA8GA1UEBwwIU2FuIEpvc2UxCzAJBgNVBAgMAkNBMQsw
+              CQYDVQQGEwJVUzAiGA8yMDIxMDkyMTIxMTUzM1oYDzIxMjAwOTIxMjExNTMzWjBo
+              MRgwFgYDVQQDDA9HWF9ERVZJRF8zODRfUDExDDAKBgNVBAsMA1BLSTERMA8GA1UE
+              CgwISW5maW5lcmExETAPBgNVBAcMCFNhbiBKb3NlMQswCQYDVQQIDAJDQTELMAkG
+              A1UEBhMCVVMwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAR9u7gMIiiVzZT1MhEyj0r4
+              zhdnZPOsygbDm414ohr6a9reoQozKbfebizNhAVDtp+85mm+3X1imVx97jGNw4nC
+              gHc6s/E5fl7OF66+asmefuptSbgd8uyvDH29BW4zDPqjYzBhMA8GA1UdEwEB/wQF
+              MAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBR6chN0Bp843gHiigcD10/S
+              0tDgfTAfBgNVHSMEGDAWgBQspmZVgxB5unJ4tpHRdl0i3iEMdDAKBggqhkjOPQQD
+              AgNoADBlAjEAo8lrvfayW22/b2QLVYNOvdgftfhhN7G7Ly7fzT9KTNfbjyyA9ruC
+              ajvXjzLwYoOLAjAZmCMhVWXiGWcmXVwTWTHtgD0jxqITSUMJt0QFHYuTIXFXkVdJ
+              e3f85Pncqx2uGi0=
+              -----END CERTIFICATE-----
+              -----BEGIN CERTIFICATE-----
+              MIICYzCCAeqgAwIBAgIDOQgcMAoGCCqGSM49BAMCMGkxGTAXBgNVBAMMEEdYUk9P
+              VC0zODQtUHJvZDExDDAKBgNVBAsMA1BLSTERMA8GA1UECgwISW5maW5lcmExETAP
+              BgNVBAcMCFNhbiBKb3NlMQswCQYDVQQIDAJDQTELMAkGA1UEBhMCVVMwIhgPMjAy
+              MTA5MjEyMDU5MzlaGA8yMTIwMDkyMTIwNTkzOVowaTEZMBcGA1UEAwwQR1hST09U
+              LTM4NC1Qcm9kMTEMMAoGA1UECwwDUEtJMREwDwYDVQQKDAhJbmZpbmVyYTERMA8G
+              A1UEBwwIU2FuIEpvc2UxCzAJBgNVBAgMAkNBMQswCQYDVQQGEwJVUzB2MBAGByqG
+              SM49AgEGBSuBBAAiA2IABMJtZhaw3Te7pUWsfKxVO6cslnx4OE0SP207XcHvs2RT
+              snuuvHjQQegT35r0yl3NR9dN5ldxZ+SkG4xffJHRZlp70sQzjXF7BTtCg/lvDksR
+              ZCBlSEpZzXYvizh1m9yC8KNgMF4wDwYDVR0TAQH/BAUwAwEB/zALBgNVHQ8EBAMC
+              AgQwHQYDVR0OBBYEFCymZlWDEHm6cni2kdF2XSLeIQx0MB8GA1UdIwQYMBaAFCym
+              ZlWDEHm6cni2kdF2XSLeIQx0MAoGCCqGSM49BAMCA2cAMGQCMGXKYyZ4mYG2hxhZ
+              j/uGzNd7Q302VsMsy59+XR2P6DwkjYRFyKXcKuOhfvqe+O++TwIwTxxQHRu0H+3d
+              VGkGM7sVfKpscPjp56ywYp18AqkfPAHk+jbBW32Vpf7PE6sB/lfj
+              -----END CERTIFICATE-----
+        hub:
+          certificateAuthority:
+            grpc:
+              address: "am-plgd-hub-certificate-authority-grpc:9100"
+          coapGateway: "am-plgd-hub-coap-gateway-tcp:5684"
+          authorization:
+            provider:
+              name: "plgd.dps"
+              clientId: "xr-plgd-client"
+              clientSecret: "xr-plgd-client"
+      - id: "6801cd99-05cf-49fb-ae69-a17d60627e0d"
+        owner: "ipm-plgd-claim"
+        attestationMechanism:
+          x509:
+            certificateChain: |-
+              -----BEGIN CERTIFICATE-----
+              MIICZzCCAe6gAwIBAgIDBm0rMAoGCCqGSM49BAMCMGsxGzAZBgNVBAMMElhSUk9P
+              VC0zODQtUDFUZXN0MTEMMAoGA1UECwwDUEtJMREwDwYDVQQKDAhJbmZpbmVyYTER
+              MA8GA1UEBwwIU2FuIEpvc2UxCzAJBgNVBAgMAkNBMQswCQYDVQQGEwJVUzAiGA8y
+              MDIyMTIxNTE5NTUwN1oYDzIxMjExMjE1MTk1NTA3WjBrMRswGQYDVQQDDBJYUlJP
+              T1QtMzg0LVAxVGVzdDExDDAKBgNVBAsMA1BLSTERMA8GA1UECgwISW5maW5lcmEx
+              ETAPBgNVBAcMCFNhbiBKb3NlMQswCQYDVQQIDAJDQTELMAkGA1UEBhMCVVMwdjAQ
+              BgcqhkjOPQIBBgUrgQQAIgNiAAS58Cr1lKyu4ygY2tCH6fnhxq0uzjHYWlHF4+W4
+              atCIItULEuoHdOY0N3feMF2tLwhPR3rqU35uallioq1Mj1xR1nZa2JwT9GwKc3nv
+              1vQuBVuUs7CjQ93wOdnZ7Yv1yPGjYDBeMA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0P
+              BAQDAgIEMB0GA1UdDgQWBBTCLx3yfwSws3t5izDGJe4bKgsKXDAfBgNVHSMEGDAW
+              gBTCLx3yfwSws3t5izDGJe4bKgsKXDAKBggqhkjOPQQDAgNnADBkAjAfD1CaGdzD
+              hdzC5HkA3MiEsVd5Q6SpI4wO0ByB41jGxPnY7apWRZ+JyIlDpCSWxDoCMBRUhUZl
+              WSegb6FuUKcLUQd2HSCmzMHyQQ14MnFHzRnfeIkxUNW/wfvAWU/x+r+ibQ==
+              -----END CERTIFICATE-----
+        hub:
+          certificateAuthority:
+            grpc:
+              address: "am-plgd-hub-certificate-authority-grpc:9100"
+          coapGateway: "am-plgd-hub-coap-gateway-tcp:5684"
+          authorization:
+            provider:
+              name: "plgd.dps"
+              clientId: "xr-plgd-client"
+              clientSecret: "xr-plgd-client"
+      - id: "2f0d3d81-0e09-4f1e-9706-0997488011af"
+        owner: "ipm-plgd-claim"
+        attestationMechanism:
+          x509:
+            certificateChain: |-
+              -----BEGIN CERTIFICATE-----
+              MIICJzCCAc6gAwIBAgIUEx8pn0SVNxPgZzlQWDo2MxJ4EdwwCgYIKoZIzj0EAwIw
+              cTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExETAPBgNVBAcTCFNh
+              biBKb3NlMRIwEAYDVQQKEwlPcGVuIFhSQ00xEjAQBgNVBAsTCVhSQ00gQXJjaDES
+              MBAGA1UEAxMJT3BlbiBYUkNNMCAXDTIyMDMyNTIwNDgwMFoYDzIwNTIwMzE3MjA0
+              ODAwWjBxMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTERMA8GA1UE
+              BxMIU2FuIEpvc2UxEjAQBgNVBAoTCU9wZW4gWFJDTTESMBAGA1UECxMJWFJDTSBB
+              cmNoMRIwEAYDVQQDEwlPcGVuIFhSQ00wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNC
+              AATg27n6WQrnnLPSkNpC3wbN/AeG5aawWXNj8tDbNXA0Q5jVSqH8FH6xbmuVW+Xh
+              /7O5obv5oain2/4HJ/rdRtsno0IwQDAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/
+              BAUwAwEB/zAdBgNVHQ4EFgQUCUxIEwLqBXMOhioSiEwqYRPvtPMwCgYIKoZIzj0E
+              AwIDRwAwRAIgRsvE9yvWQmicO+onaDXvOZ4Hj+1mOWCJVmzqcOJVy5MCIEjdb4vo
+              lcaJ2e1dL537jA5YM0O503Ot4+/fK1ijF1tn
+              -----END CERTIFICATE-----
+        hub:
+          certificateAuthority:
+            grpc:
+              address: "am-plgd-hub-certificate-authority-grpc:9100"
+          coapGateway: "am-plgd-hub-coap-gateway-tcp:5684"
+          authorization:
+            provider:
+              name: "plgd.dps"
+              clientId: "xr-plgd-client"
+              clientSecret: "xr-plgd-client"
+    extraVolumeMounts:
+      - name: mongodb-tls-cfg
+        mountPath: /certs/mongodb
+    extraVolumes:
+      - name: mongodb-tls-cfg
+        secret:
+          secretName: mongodb-client-tls
+    clients:
+      storage:
+        mongoDB:
+          uri: mongodb://inf-mongodb:27017
+          tls:
+            caPool: "/certs/mongodb/ca.crt"
+            keyFile: "/certs/mongodb/tls.key"
+            certFile: "/certs/mongodb/tls.crt"
+namespace_inf: ipm-inf
+namespace_am: ipm-am
+namespace_keycloak: ipm-keycloak
+service_nats: inf-nats
+service_mqtt: inf-emqx
+service_grpc_gw: am-plgd-hub-grpc-gateway
+service_http_gw: am-plgd-hub-http-gateway
+service_oauth: am-plgd-hub-mock-oauth-server
+afm:
+  name: xr-afm
+  # -- Full name to override
+  fullnameOverride: xr-afm
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: aggregation-fault-management
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: "ghcr.io/infinera/"
+    # -- Image repository
+    repository: "ipm/afm"
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets:
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret        
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # @ignore -- extra volume for mqtt tls secret  
+    - name: mqtt-tls
+      secret:
+        secretName: mqtt-client-tls
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    # -- extra volume mount for mqtt tls secret
+    - name: mqtt-tls
+      mountPath: /certs/mqtt
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) Number of soaking threads (bowls) to use in the PRS function
+    SoakingBowls: 5
+    #  -- (duration) Expected latency, in milliseconds, of the system from the device to AFM
+    ExpectedLatency: 0ms
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize: 25
+    # -- Service configuration file
+    fileName: xr-afm-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    mqtt:
+      # -- (string) uri for MQTT server, defaults for deployed MQTT broker from Aggregation Manager chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mqtt/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mqtt/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mqtt/tls.crt"
+      # -- (string) AFM MQTT client identifier to use
+      clientIdentifiers: AFM_MQTT_CLIENT
+      # -- AFM regions to subscribe. Wildcard "+" subscribes all regions. Multiple regions must be comma separated.	
+      regions: +
+      # -- AFM device type report registration. Wildcard "+" subscribes all types.
+      # Multiple types must be comma separated.
+      # Possible values are {+, Mod, NDU}.
+      supportedDevices: +
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+  ingress:
+    fileName: xr-afm-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /afm
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-afm
+            port: afm-port
+dcd:
+  name: xr-dcd
+  # -- Full name to override
+  fullnameOverride: xr-dcd
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: device-configuration-distributor
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: "ghcr.io/infinera/"
+    # -- Image repository
+    repository: "ipm/dcd"
+    # -- Image tag.
+    tag: v1.2.3-2
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets:
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    mqtt:
+      fault:
+        # -- address of the MQTT configured in IPM to be configured in the XR/NDU device
+        uri: inf-emqx-headless
+        # -- port of the MQTT configured in IPM to be configured in the XR/NDU device. 
+        # Defaults to secure MQTT port.
+        port: 1883
+        # -- Connection keep alive time in seconds.
+        #    A Keep Alive value of 0 has the effect of turning off the Keep Alive mechanism.
+        kai:
+      telemetry:
+        # -- address of the MQTT configured in IPM to be configured in the XR/NDU device
+        uri: inf-emqx-headless
+        # -- port of the MQTT configured in IPM to be configured in the XR/NDU device.
+        # Defaults to secure MQTT port.
+        port: 1883
+        # -- Connection keep alive time in seconds.
+        #    A Keep Alive value of 0 has the effect of turning off the Keep Alive mechanism.        
+        kai:
+    # -- Service configuration file
+    fileName: xr-dcd-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    mqtt:
+      # -- (string) uri for MQTT server, defaults for deployed MQTT broker from Aggregation Manager chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mqtt/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mqtt/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mqtt/tls.crt"
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+  ingress:
+    fileName: xr-dcd-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /dcd
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dcd
+            port: dcd-port

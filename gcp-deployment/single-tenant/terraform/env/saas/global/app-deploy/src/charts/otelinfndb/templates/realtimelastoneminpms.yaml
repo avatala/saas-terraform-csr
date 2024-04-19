@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: realtime-oneminute-records
+  labels:
+    grafana_dashboard: "1"
+data:
+  reailtime_onemin_record.json: |-
+    {{- $.Files.Get "dashboards/Real-time PMs - Last 1min - N Records.json"  | nindent 4 -}}

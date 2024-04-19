@@ -1,0 +1,95 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: sh
+    id: Repo creation
+    args:
+    - '-c'
+    - | 
+      if gcloud artifacts repositories describe saas-gcip --location=${_REGION} --project=${_PREFIX}-admin-host; then
+        echo "Artifact Registry repository exists"
+      else
+        if [ "${_KMS_KEY_PATH}" = "null" ]; then
+          gcloud artifacts repositories create saas-gcip --repository-format=docker --location=${_REGION} --project=${_PREFIX}-admin-host;
+        else
+          gcloud artifacts repositories create saas-gcip --repository-format=docker --location=${_REGION} --project=${_PREFIX}-admin-host --kms-key=${_KMS_KEY_PATH};
+        fi
+      fi
+
+  - name: "gcr.io/cloud-builders/docker"
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap/authui-container
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${_PREFIX}-admin-host/saas-gcip/gcip-iap-authui-${_PREFIX}:latest"
+      - "."
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/${_PREFIX}-admin-host/saas-gcip/gcip-iap-authui-${_PREFIX}:latest"
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      sed -e "s|KMS_KEY_PATH|${_KMS_KEY_PATH}|g" -e "s/TEMP_SEED_PROJECT_ID/$PROJECT_ID/g" -e "s/REGION_NAME/${_REGION}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  terraform.tfvars.tpl > terraform.tfvars;
+
+      #sed -e "s/PREFIX_NAME/${_PREFIX}/g" main.tf.tpl > main.tf;
+
+      sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g"  -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloudrun-iap
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'serverless-neg-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s

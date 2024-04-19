@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: metrics-explorer
+  labels:
+    grafana_dashboard: "1"
+data:
+  metrics_explorer.json: |-
+    {{- $.Files.Get "dashboards/metrics-explorer.json"  | nindent 4 -}}

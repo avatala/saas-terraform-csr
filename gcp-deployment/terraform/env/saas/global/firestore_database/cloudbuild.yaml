@@ -1,0 +1,76 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+    - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+      id: Generate manifest for deployment
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      entrypoint: 'bash'
+      args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" terraform.tfvars.tpl > terraform.tfvars;
+
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+
+        if [ ${_REGION} == "us-central1" ] || [ ${_REGION} == "us-central2" ]; then
+          sed  -e "s/REGION_NAME/nam5/g" main.tf.tpl > main.tf;
+        elif [ ${_REGION} == "europe-west1" ] || [ ${_REGION} == "europe-west4" ]; then
+          sed  -e "s/REGION_NAME/eur3/g" main.tf.tpl > main.tf;
+        else
+          sed -e "s/REGION_NAME/${_REGION}/g" main.tf.tpl > main.tf;
+        fi
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      args:
+        - '-c'
+        - |
+          terraform init
+      id: terraform init
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      args:
+        - '-c'
+        - |
+          terraform fmt
+      id: terraform fmt
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      args:
+        - '-c'
+        - |
+          terraform validate
+      id: terraform validate
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      args:
+        - '-c'
+        - |
+          terraform plan
+      id: terraform plan
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/global/firestore_database
+      args:
+        - '-c'
+        - |
+          terraform apply -input=false -auto-approve
+      id: terraform apply
+      entrypoint: sh 
+
+    - name: 'gcr.io/cloud-builders/gcloud'
+      args: ['alpha', 'builds', 'triggers', 'run', 'docker-build-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+      id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s

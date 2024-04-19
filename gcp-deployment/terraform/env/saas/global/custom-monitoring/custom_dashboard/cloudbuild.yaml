@@ -1,0 +1,85 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+
+steps:
+  - name: "gcr.io/cloud-builders/gcloud"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    id: Generate Terraform Manifest
+    entrypoint: sh
+    args:
+    - '-c'
+    - |-
+      freemium_project_number=$(gcloud projects describe $$_FREEMIUM_PROJECT_ID  --format='value(projectNumber)')
+      host_project_number=$(gcloud projects describe $$HOST_PROJECT_ID  --format='value(projectNumber)')
+      sed -e "s/Freemium_Project_ID/$$_FREEMIUM_PROJECT_ID/g" -e "s/Freemium_Project_Number/$freemium_project_number/g" freemium-gke-dashboard.json.tpl > freemium-gke-dashboard.json
+      sed -e "s/HOST_PROJECT_ID/$$HOST_PROJECT_ID/g" -e "s/HOST_PROJECT_NUMBER/$host_project_number/g" admin-lb-dashboard.json.tpl > admin-lb-dashboard.json
+      sed -e "s/TF_STATE_BUCKET_NAME/${_TF_STATE_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+      sed -e "s/HOST_PROJECT_ID/$$HOST_PROJECT_ID/g" terraform.tfvars.tpl > terraform.tfvars
+    secretEnv: ['_FREEMIUM_PROJECT_ID', 'HOST_PROJECT_ID']
+
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+    
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+    
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+    
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/custom-monitoring/custom_dashboard
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+    
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'notification-channel-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_PROJECT_ID/versions/latest
+    env: _FREEMIUM_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_HOST_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  # - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ANTHOS_PROJECT_ID/versions/latest
+  #   env: ANTHOS_PRJ_ID
+    
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY

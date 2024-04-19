@@ -1,0 +1,258 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_APIGEE=${_APIGEE}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout  ${_BRANCH_NAME}
+      if [ "${_APIGEE}" = "false" ]; then
+        sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+        sh script.sh
+        rm -rf script.sh
+      else
+        sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+        sh appigee.sh
+        rm -rf appigee.sh
+      fi
+    secretEnv: ['_CLOUD_FUNCTION_URI','_CUSTOMER_REGION']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/$$_CUSTOMER_NAME/g" gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "$$_CUSTOMER_EMAIL"
+        git config --global user.name "$$_CUSTOMER_NAME"
+        git commit -m "client $$_CUSTOMER_NAME's subnet deleted"
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_SEED_PROJECT_ID=$PROJECT_ID"
+      - "_KMS_KEY_PATH=${_KMS_KEY_PATH}"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git config --global user.email "$$_CUSTOMER_EMAIL"
+      git config --global user.name "$$_CUSTOMER_NAME"
+      mkdir -p gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend/
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend/terraform.tfvars
+      cp gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/backend-setup.sh  gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend/backend-setup.sh
+      for f in $(find gcp-deployment/single-tenant/terraform/env/saas/global/networking/backend-template/ -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend/$(basename $f)"; done
+      git add .
+      git commit -m "client $$_CUSTOMER_NAME's backend created"
+      git push --set-upstream origin ${_BRANCH_NAME}
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL','_CUSTOMER_REGION', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX','ENTERPRISE_SUB_DOMAIN', 'FIREBASE_CLIENT_ID', 'FIREBASE_CLIENT_SECRET']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+        terraform init
+    id: terraform init
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX']
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory idp
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/$$_CUSTOMER_NAME/g" gcp-deployment/single-tenant/terraform/env/saas/global/google-platform-config-template/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/global/google-platform-config-template/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/global/google-platform-config-template/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "$$_CUSTOMER_EMAIL"
+        git config --global user.name "$$_CUSTOMER_NAME"
+        git commit -m "client $$_CUSTOMER_NAME's subnet deleted"
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Change secret value idp
+    entrypoint: 'bash'
+    env:
+      - "_SEED_PROJECT_ID=$PROJECT_ID"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git config --global user.email "$$_CUSTOMER_EMAIL"
+      git config --global user.name "$$_CUSTOMER_NAME"
+      mkdir -p gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-google-platform-config/
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/global/google-platform-config-template/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-google-platform-config/terraform.tfvars
+      for f in $(find gcp-deployment/single-tenant/terraform/env/saas/global/google-platform-config-template/ -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-google-platform-config/$(basename $f)"; done
+      git add .
+      git commit -m "client $$_CUSTOMER_NAME's backend created"
+      git push --set-upstream origin ${_BRANCH_NAME}
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_EMAIL','_CUSTOMER_REGION', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX','ENTERPRISE_SUB_DOMAIN', 'FIREBASE_CLIENT_ID', 'FIREBASE_CLIENT_SECRET']
+
+
+  - name: 'hashicorp/terraform:1.0.7'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+        terraform init
+    id: terraform init IDP
+    entrypoint: sh
+
+  - name: 'hashicorp/terraform:1.0.7'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+        terraform fmt
+    id: terraform fmt IDP
+    entrypoint: sh
+
+  - name: 'hashicorp/terraform:1.0.7'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+        terraform validate
+    id: terraform validate IDP
+    entrypoint: sh
+
+  - name: 'hashicorp/terraform:1.0.7'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+        terraform plan
+    id: terraform plan IDP
+    entrypoint: sh
+
+  - name: 'hashicorp/terraform:1.0.7'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+        terraform apply -input=false -auto-approve
+    id: terraform apply IDP
+    entrypoint: sh
+
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-bigquery-saas-trigger --branch=${_BRANCH_NAME} --region $$_CUSTOMER_REGION
+    id: 'trigger next build'
+    secretEnv: ['_CUSTOMER_REGION']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_EMAIL/versions/latest
+    env: _CUSTOMER_EMAIL
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-TF_STATE_BUCKET_NAME/versions/latest
+    env: TF_STATE_BUCKET_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-LOG_BUCKET_NAME/versions/latest
+    env: LOG_BUCKET_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-PREFIX/versions/latest
+    env: PREFIX
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: 'ENTERPRISE_SUB_DOMAIN'
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FIREBASE_CLIENT_ID/versions/latest
+    env: 'FIREBASE_CLIENT_ID'
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FIREBASE_CLIENT_SECRET/versions/latest
+    env: 'FIREBASE_CLIENT_SECRET'  
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY

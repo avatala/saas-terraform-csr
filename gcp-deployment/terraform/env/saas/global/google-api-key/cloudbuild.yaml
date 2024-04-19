@@ -1,0 +1,77 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key/
+    env:
+    - "TF_STATE_BUCKET_NAME=${_TFSTATE_GCS_BUCKET_NAME}"
+    - "_PREFIX=${_PREFIX}"
+    args:
+      - "-c"
+      - |
+        for file in *.tpl; do envsubst < $file > $(basename $file .tpl); done
+    id: generate terraform manifests
+    entrypoint: sh
+    secretEnv: ['_SEED_PROJECT_ID']
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key
+    args:
+      - "-c"
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key
+    args:
+      - "-c"
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key
+    args:
+      - "-c"
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key
+    args:
+      - "-c"
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+
+  - name: "hashicorp/terraform:1.0.7"
+    dir: gcp-deployment/terraform/env/saas/global/google-api-key
+    args:
+      - "-c"
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+  
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'gcs-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_SEED_PROJECT_ID/versions/latest
+    env: _SEED_PROJECT_ID
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY

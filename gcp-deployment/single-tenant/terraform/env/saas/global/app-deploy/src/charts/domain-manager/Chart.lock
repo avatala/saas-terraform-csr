@@ -1,0 +1,6 @@
+dependencies:
+- name: temporal
+  repository: https://pt-artifactory.infinera.com/artifactory/pt-helm-virtual
+  version: 0.25.0
+digest: sha256:10f88d0dcc5061fb041669eacf8020c2a104976ce69e3f3c9fcf14103822788f
+generated: "2023-07-25T08:22:48.772509897+01:00"

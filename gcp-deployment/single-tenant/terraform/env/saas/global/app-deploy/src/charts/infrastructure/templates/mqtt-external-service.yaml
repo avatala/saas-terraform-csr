@@ -1,0 +1,22 @@
+{{- if .Values.nodePortEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: inf-emqx-external
+spec:
+  type: NodePort
+  ports:
+    - name: mqtt
+      nodePort: 31883
+      port: 1883
+      targetPort: 1883
+      protocol: TCP
+    - name: mqtts
+      nodePort: 8883
+      port: 8883
+      targetPort: 8883
+      protocol: TCP
+  selector:
+    app.kubernetes.io/instance: inf
+    app.kubernetes.io/name: emqx
+{{- end }}

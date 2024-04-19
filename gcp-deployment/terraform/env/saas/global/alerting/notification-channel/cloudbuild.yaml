@@ -1,0 +1,70 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    secretEnv: ['HOST_PROJECT_ID']
+    entrypoint: /bin/sh
+    args:
+      - '-c'
+      - | 
+        sed -e "s/HOST_PROJECT/$$HOST_PROJECT_ID/g" -e "s/VENDOR_EMAIL_ID_/${_VENDOR_EMAIL_ID}/g" terraform.tfvars.tpl > terraform.tfvars;
+        sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf;
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/notification-channel
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'alert-policy-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY 
+timeout: 86400s     
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  

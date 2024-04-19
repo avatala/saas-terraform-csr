@@ -1,0 +1,22 @@
+devices:
+  - resource_data:
+      di: 3f7d8db6-87d4-436e-bccc-e78e8f93d02a
+      dt: xr
+      sn: "123456"
+      role: leaf
+      module_attr:
+        - network: XR
+        - service: service
+        - tc: transport
+        - user_attr_1: "attr1"
+        - user_attr_2: "attr2"
+
+  - resource_data:
+      di: 60757be8-3aa8-4954-95be-ce270b783be6
+      dt: xr
+      sn: "12345678"
+      role: leaf
+      module_attr:
+        - network: XR
+        - service: service
+        - tc: transport

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "DomainManager.network-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "DomainManager.labels" . | nindent 4 }}
+      {{- with .Values.ns.service.labels }}
+      {{- . | toYaml | nindent 4 }}
+      {{- end }}
+spec:
+  type: {{ .Values.ns.service.type | default "ClusterIP" }}
+  ports:
+  - name: ns-port
+    port: {{ .Values.ns.port | default "8080" }}
+    targetPort: ns-port
+  selector:
+   {{- include "DomainManager.network-service.selectorLabels" . | nindent 4 }}

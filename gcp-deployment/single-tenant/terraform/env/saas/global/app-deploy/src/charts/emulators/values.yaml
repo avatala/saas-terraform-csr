@@ -1,0 +1,65 @@
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+  image:
+    #for IPM 1.1 
+      #xr: "se-artif-prd.infinera.com/docker-icex-local/xr/master/xr-image-integration:2023-04-25_134615_demo"
+      ##ndu: "se-artif-prd.infinera.com/docker-icex-local/ndu/master/ndu-image-emulator:23-05-24_145422_demo"
+      # xr: "ghcr.io/infinera/ipm/xr-emulator:2023-04-25"
+      # ndu: "ghcr.io/infinera/ipm/ndu-emulator:2023-05-24"
+    # for IPM 1.2
+    xr: ipm/emulator/xr:v23.10.05
+    ndu: ipm/emulator/ndu:v23.10.10
+    pullPolicy: IfNotPresent 
+plgd:
+  DPS_ENDPOINT: "coaps+tcp://am-plgd-dps-device-provisioning-service-tcp:5684" 
+replicaCount: 1
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+  # fsGroup: 2000
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}

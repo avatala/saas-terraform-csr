@@ -1,0 +1,368 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/single-tenant-tenant-destroy/
+    entrypoint: 'bash'
+    env:
+        - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+      - '-c'
+      - |
+        git fetch > /dev/null 2>&1
+        git checkout ${_CUSTOMER_NAME}
+              
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-asm-acm
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant gke asm acm
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-cloud-deploy
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant cloud deploy
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        gcloud config set project $$_ENTERPRISE_PROJECT_ID
+        gsutil -m rm -r gs://*_clouddeploy
+        gsutil -m rm -r gs://$$_CUSTOMER_REGION.deploy-artifacts.$$_ENTERPRISE_PROJECT_ID.appspot.com
+    id: destroy tenant cloud deploy storage buckets
+    entrypoint: sh
+    secretEnv: ['_ENTERPRISE_PROJECT_ID','_CUSTOMER_REGION']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/cloud-bigquery/${_CUSTOMER_NAME}-scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_CUSTOMER_NAME}-saas-cloudbq-sa@$$_ENTERPRISE_PROJECT_ID.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform init
+        terraform destroy -input=false -auto-approve
+        gcloud config unset auth/impersonate_service_account
+    id: destroy tenant scheduled queries 
+    entrypoint: sh
+    secretEnv: ['_ENTERPRISE_PROJECT_ID']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-tenant-iap-access
+    args:
+      - '-c'
+      - |
+        if [ "${_APIGEE}" == "true" ];then
+           echo "skip"
+        else
+          terraform init
+          terraform destroy -input=false -auto-approve
+        fi
+    id: destroy tenant iap
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_LB_TYPE=${_LB_TYPE}"
+    args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        if [ "${_LB_TYPE}" = "http" ]; then
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-dns-mapping
+        terraform init
+        terraform destroy -input=false -auto-approve
+        else
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-tcp-tenant-mapping
+        terraform init
+        terraform destroy -input=false -auto-approve
+        fi
+    id: 'destroy mapping of tenant'
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Backend
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_PREFIX=${_PREFIX}"
+    args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        if [ "${_LB_TYPE}" = "http" ]; then
+          command="gcloud compute url-maps remove-path-matcher ${_PREFIX}-lb  --path-matcher-name=${_CUSTOMER_NAME}-matcher --global --project ${_PREFIX}-admin-host"
+
+          while true; do
+            output=$($command 2>&1)
+            if [[ "$output" == *"Updated"* ]]; then
+              echo "Command output: $output"
+              break
+            else
+              echo "Command output: $output"
+              echo "Waiting for 'Updated' in output..."
+              sleep 2
+            fi
+          done
+        fi
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_LB_TYPE=${_LB_TYPE}"
+    args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        if [ "${_LB_TYPE}" = "http" ]; then
+          cd gcp-deployment/single-tenant/terraform/env/saas/global/networking/$$_CUSTOMER_NAME-backend
+          terraform init
+          terraform destroy -input=false -auto-approve
+        fi
+    id: 'destroy Backend'
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_LB_TYPE=${_LB_TYPE}"
+    args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        if [ "${_LB_TYPE}" = "http" ]; then
+          cd gcp-deployment/single-tenant/terraform/env/saas/regions/$$_CUSTOMER_NAME-mig
+          terraform init
+          terraform destroy -input=false -auto-approve
+        fi
+    id: 'destroy mig'
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant triggers
+    entrypoint: sh
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/custom-monitoring/${_CUSTOMER_NAME}-metrics-scope
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy metrics scope
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/custom-monitoring/${_CUSTOMER_NAME}-custom-dashboard
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy custom dashboard
+    entrypoint: sh
+
+  # - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+  #   dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-github-repo
+  #   args:
+  #     - '-c'
+  #     - |
+  #       terraform init
+  #       terraform destroy -input=false -auto-approve
+  #   id: destroy tenant github repo
+  #   entrypoint: sh
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: destroy tenant application workloads
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      apt-get update && apt-get install -y wget tar &>/dev/null
+      wget https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz &>/dev/null
+      tar -zxvf helm-v3.13.2-linux-amd64.tar.gz &>/dev/null
+      mv linux-amd64/helm /usr/local/bin/helm
+      gcloud container clusters get-credentials $$_CUSTOMER_NAME-saas-tenant-cluster-us-ct1-01 --region $$_CUSTOMER_REGION --project $$_ENTERPRISE_PROJECT_ID
+      helm ls --all --short -n $$_CUSTOMER_NAME | xargs -L1 helm uninstall -n $$_CUSTOMER_NAME
+      sleep 60
+      kubectl delete ns $$_CUSTOMER_NAME
+    secretEnv: ['_CUSTOMER_NAME', '_CUSTOMER_REGION', '_ENTERPRISE_PROJECT_ID']
+
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant gke cluster
+    entrypoint: sh
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/networking/${_CUSTOMER_NAME}-subnets
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant subnets
+    entrypoint: sh
+    
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/iam/${_CUSTOMER_NAME}-custom-roles
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant custom roles
+    entrypoint: sh
+    
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/iam/${_CUSTOMER_NAME}-service-accounts
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant service accounts
+    entrypoint: sh
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/iam/${_CUSTOMER_NAME}-member-iam-bindings
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant member iam bindings
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        if [ "${_APIGEE}" == "true" ];then
+          cd gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-apigee-components
+          terraform init
+          terraform destroy -input=false -auto-approve
+          bash apigee-kvm-delete.sh
+        fi
+    id: destroy apigee components
+    entrypoint: bash
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/resource-hierarchy/${_CUSTOMER_NAME}-service-projects
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant project
+    entrypoint: sh
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        gcloud beta billing projects unlink $$_ENTERPRISE_PROJECT_ID
+    id: disable billing for enterprise project
+    entrypoint: sh
+    secretEnv: ['_ENTERPRISE_PROJECT_ID']
+    
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/resource-hierarchy/${_CUSTOMER_NAME}-service-folders
+    args:
+      - '-c'
+      - |
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant sub-folder
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-secret-manager
+    args:
+      - '-c'
+      - |
+        gcloud secrets delete $${_CUSTOMER_NAME}_APP_VERSION --project $$SEED_PROJECT_ID --quiet
+        terraform init
+        terraform destroy -input=false -auto-approve
+    id: destroy tenant secret manager
+    entrypoint: sh
+    secretEnv: ["_CUSTOMER_NAME","SEED_PROJECT_ID"]
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory for cloud build trigger
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_CUSTOMER_EMAIL=${_CUSTOMER_EMAIL}"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git push origin -d ${_CUSTOMER_NAME}
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/single-tenant-tenant-destroy/
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout  ${_BRANCH_NAME}
+      sed -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g"  -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+      sh script.sh
+      rm -rf script.sh
+    secretEnv: ['_CLOUD_FUNCTION_URI']
+    
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-ENTERPRISE_PROJECT_ID/versions/latest
+    env: _ENTERPRISE_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_SEED_PROJECT_ID/versions/latest
+    env: SEED_PROJECT_ID
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+    workerPool:
+      'projects/${_PREFIX}-anthos-hub/locations/${_PRE_REQ_REGION}/workerPools/${_PREFIX}-private-worker-pool'

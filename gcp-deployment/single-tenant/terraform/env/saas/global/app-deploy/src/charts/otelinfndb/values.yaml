@@ -1,0 +1,281 @@
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+xripm-int:
+  enabled: false
+  config:
+    mqtt:
+      endpoint: inf-emqx-headless:1883
+    nats:
+      servers: ["inf-nats:4222"]
+    ipm:
+      hostname: keycloak-keycloakx-http
+      get_modules_end_point: http://xr-mm:8080/api/v1/modules/
+  image:
+    repository: ipm/telemetry/ipm-pm-integration-service
+    pullPolicy: IfNotPresent
+    tag: v0.13.9
+grafana:
+  enabled: true
+  sidecar:
+    dashboards:
+      enabled: true
+      labelValue: 1
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+    - grafana.localhost
+    tls:
+    - secretName: grafana-tls
+      hosts:
+      - grafana.localhost
+  adminUser: admin
+  adminPassword: "public"
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: InfluxDB-Flux
+        type: influxdb
+        url: "http://otelinfndb-influxdb:8086"
+        access: proxy
+        database: "xr-1m"
+        basicAuth: false
+        basicAuthUser: ""
+        withCredentials: false
+        isDefault: true
+        version: 2
+        readOnly: false
+        jsonData:
+          defaultBucket: "xr-1m"
+          organization: "arch"
+          timeout: 300
+          version: "Flux"
+        secureJsonData:
+          token: "secretToken"
+collector:
+  enabled: true
+  etcd:
+    enabled: true
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 15
+      periodSeconds: 15
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 15
+      periodSeconds: 15
+    auth:
+      rbac:
+        create: false
+  emqx:
+    enabled: true
+    emqxConfig:
+      EMQX_CLUSTER__DISCOVERY_STRATEGY: "dns"
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: "public123"
+      EMQX_DASHBOARD__DEFAULT_USERNAME: "admin"
+      EMQX_MQTT__MAX_PACKET_SIZE: '65KB'
+      EMQX_MQTT__MAX_MQUEUE_LEN: infinity        
+  influxdb:
+    enabled: true
+    auth:
+      admin:
+        username: admin
+        password: "public123"
+        token: "secretToken"
+        org: arch
+        bucket: xr-1m
+        retention: 30d
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hostname: influxdb.localhost
+      tls: false
+      extraTls:
+      - hosts:
+        - influxdb.localhost
+        secretName: influxdb-tls
+    influxdb:
+      readinessProbe:
+        enabled: true
+        initialDelaySeconds: 0
+        periodSeconds: 30
+  sharding:
+    enabled: true
+    etcd:
+      enabled: false
+    emqx:
+      enabled: false
+    hashring:
+      partitionCount: 997
+      replicationFactor: 1009
+      load: 1.0000093457
+      numShards: 3
+      shardPrefix: "otelinfndb-collector"
+    endpoints:
+      etcd:
+      - "http://otelinfndb-etcd:2379"
+      mqttClient: 
+        clientId: "sharding-service"
+        broker: "tcp://otelinfndb-emqx:1883"
+        qos: 1
+        username: "admin"
+        password: "public123"
+        subscribe:
+          newDevices: ipm/event/device/create/+
+          stripPrefix: ipm/event/device/create/
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+      infnxrmetrics:
+        collection_interval: 30s
+        retry_interval: 1m
+        simulate_metrics: false
+        debug_metrics: false
+        mqtt_metrics: true
+        mqtt_configs:
+          broker:
+            server: "otelinfndb-emqx"
+            port: 1883
+            username: "admin"
+            password: "public123"
+            reconnect_interval: 1m
+            auto_reconnect: true
+            max_inflight: 2000
+            pm_topic_prefix: "+/+/mod/pm"
+            etcd_clientv3:
+              dial_timeout: 5s
+              endpoints:
+              - "http://otelinfndb-etcd:2379"  
+            dt: "xr"
+        scrapers: 
+        #  valid scrapers linepm, carrierpm, dscpm, clientpm, odupm, otupm
+          linepm: {}
+          carrierpm: {}
+          otupm: {}
+          dscpm: {}
+          clientpm: {}
+          odupm: {}
+    processors:
+    exporters:
+      logging:
+        verbosity: detailed
+      influxdb/1m:
+        endpoint: http://otelinfndb-influxdb:8086/api/v2/write
+        timeout: 2000ms
+        org: arch
+        bucket: xr-1m
+        token: secretToken
+        metrics_schema: telegraf-prometheus-v1
+        sending_queue:
+          enabled: true
+          num_consumers: 3
+          queue_size: 10
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 3s
+          max_elapsed_time: 10s       
+    service:
+      pipelines:
+        metrics:
+          receivers: [infnxrmetrics, otlp]
+          processors: []
+          exporters: [logging,influxdb/1m]   
+      telemetry:
+        logs:
+          level: debug
+  replicaCount: 1
+  image:
+    repository: ipm/telemetry/otelinfncol
+    tag: v0.13.5
+    pullPolicy: IfNotPresent
+  imagePullSecrets:
+  - name: infn-registry
+  nameOverride: ""
+  fullnameOverride: ""
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  service:
+    type: ClusterIP
+    otlp:
+      port: 4317
+    otlphttp:
+      port: 4318
+  ingress:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+    hosts:
+      - host: grafana.localhost
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: 
+      - hosts:
+        - grafana.localhost
+        secretName: grafana-tls
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+resources: {}
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}

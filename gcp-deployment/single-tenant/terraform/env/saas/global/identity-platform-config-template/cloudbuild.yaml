@@ -1,0 +1,38 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove google idp
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_CUSTOMER_EMAIL=${_CUSTOMER_EMAIL}"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git fetch > /dev/null 2>&1
+      git checkout ${_CUSTOMER_NAME}
+      if [ "${_IS_ENABLED}" == "false" ];then
+      cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+      terraform init
+      terraform destroy -input=false -auto-approve
+      else
+      cd gcp-deployment/single-tenant/terraform/env/saas/global/${_CUSTOMER_NAME}-google-platform-config
+      terraform init
+      terraform plan
+      terraform apply -input=false -auto-approve 
+      fi
+
+
+
+  
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s

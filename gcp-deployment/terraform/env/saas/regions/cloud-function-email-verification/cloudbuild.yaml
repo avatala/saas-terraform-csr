@@ -1,0 +1,82 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps: 
+    - name: 'gcr.io/cloud-builders/gcloud'
+      id: Generate manifest for deployment
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      entrypoint: sh
+      args:
+      - '-c'
+      - | 
+        sed -e "s/REGION_NAME/${_REGION}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/TEMP_SEED_PROJECT_ID/$PROJECT_ID/g" terraform.tfvars.tpl > terraform.tfvars;
+
+        sed -e "s/REGION_NAME/${_REGION}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/ADMIN_DOMAIN_/${_ADMIN_DOMAIN}/g"  -e "s/FREEMIUM__TRIGGER__ID/$$FREEMIUM_TRIGGER_ID/g"  -e "s/FREEMIUM__TRIGGER__LOCATION/$$FREEMIUM_TRIGGER_LOCATION/g" -e "s/APP_REPO_NAME_/${_CSR_APP_REPO_NAME}/g" -e "s/REPO_BRANCH_NAME/${_TERRAFORM_CODE_BRANCH_NAME}/g" -e "s/ENTERPRISE__TRIGGER__ID/$$ENTERPRISE_TRIGGER_ID/g" -e "s/ENTERPRISE__TRIGGER__LOCATION/$$ENTERPRISE_TRIGGER_LOCATION/g" -e "s/CODE_REPOSITORY_NAME/${_CSR_TERRAFORM_REPO_NAME}/g" main.tf.tpl > main.tf;
+
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g"  -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+        
+      secretEnv: ["FREEMIUM_TRIGGER_LOCATION","ENTERPRISE_TRIGGER_ID","ENTERPRISE_TRIGGER_LOCATION","FREEMIUM_TRIGGER_ID"]
+
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      args:
+        - '-c'
+        - |
+          terraform init
+      id: terraform init
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      args:
+        - '-c'
+        - |
+          terraform fmt
+      id: terraform fmt
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      args:
+        - '-c'
+        - |
+          terraform validate
+      id: terraform validate
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      args:
+        - '-c'
+        - |
+          terraform plan
+      id: terraform plan
+      entrypoint: sh
+    - name: 'hashicorp/terraform:1.0.7'
+      dir: gcp-deployment/terraform/env/saas/regions/cloud-function-email-verification
+      args:
+        - '-c'
+        - |
+          terraform apply -input=false -auto-approve
+      id: terraform apply
+      entrypoint: sh 
+  
+    - name: 'gcr.io/cloud-builders/gcloud'
+      args: ['alpha', 'builds', 'triggers', 'run', 'cloud-armor-${_PREFIX}-trigger', '--branch=${_TERRAFORM_CODE_BRANCH_NAME}']
+      id: 'trigger next build'
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_ID/versions/latest
+    env: "FREEMIUM_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_LOCATION/versions/latest
+    env: "FREEMIUM_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_ID/versions/latest
+    env: "ENTERPRISE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_LOCATION/versions/latest
+    env: "ENTERPRISE_TRIGGER_LOCATION"
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s

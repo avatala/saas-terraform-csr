@@ -1,0 +1,50 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name}}-create-temporal
+  namespace: {{ .Release.Namespace}}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "6"
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure           
+      containers:
+      - name: create-temporal
+        image: temporalio/admin-tools:1.21.2
+        volumeMounts:
+          - name: postgres-client-certs
+            mountPath: "/certs"
+            readOnly: true
+        command:
+          - sh
+          - -c
+          - |
+            # set up env
+            export SQL_PLUGIN=postgres
+            export SQL_HOST="{{ .Release.Name}}-postgresql.{{ .Release.Namespace}}.svc.cluster.local"
+            export SQL_PORT=5432
+            export SQL_USER=dbusername
+            export SQL_PASSWORD=dbpassword
+            # Create the temporal DB
+            temporal-sql-tool --db temporal create
+            # Create the temporal visibilty DB
+            temporal-sql-tool --db temporal_visibility create
+            # Set up the schema for temporal DB
+            #SQL_DATABASE=temporal ./temporal-sql-tool setup-schema -v 0.0
+            temporal-sql-tool --db temporal setup-schema -v 0.0 
+            # Update the schema for temporal DB
+            #SQL_DATABASE=temporal ./temporal-sql-tool update -schema-dir schema/postgresql/v96/temporal/versioned
+            temporal-sql-tool --db temporal update-schema -d schema/postgresql/v96/temporal/versioned
+            # Set up the schema for temporal visibility DB
+            temporal-sql-tool --db temporal_visibility setup-schema -v 0.0 
+            #SQL_DATABASE=temporal_visibility ./temporal-sql-tool setup-schema -v 0.0
+            # Update the schema for temporal visibility DB
+            #SQL_DATABASE=temporal_visibility ./temporal-sql-tool update -schema-dir schema/postgresql/v96/visibility/versioned
+            temporal-sql-tool --db temporal_visibility update-schema -d schema/postgresql/v96/visibility/versioned
+      volumes:
+        - name: postgres-client-certs
+          secret:
+            secretName: sql-server-tls 

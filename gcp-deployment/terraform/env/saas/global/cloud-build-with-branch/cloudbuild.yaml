@@ -1,0 +1,162 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: sh
+    id: valid input check
+    args:
+    - '-c'
+    - | 
+      if [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE_REQUIRED}" = "false" ]; then
+          if gcloud alpha builds triggers list --project $PROJECT_ID --format="value(name)" | grep ${_PREFIX} | grep  apigee-${_PREFIX}-trigger; then
+          echo "environment is already created with apigee. please don't rerun the trigger the trigger"
+          exit 1
+          else
+          echo "Creating HTTP environment without Apigee"
+          fi
+      elif [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE_REQUIRED}" = "true" ]; then
+          echo "Creating HTTP environment with Apigee"
+      elif [ "${_LB_TYPE}" = "tcp" ] && [ "${_APIGEE_REQUIRED}" = "false" ] && [ "${_SSL_PROXY}" = "false" ]; then
+          if gcloud alpha builds triggers list --project $PROJECT_ID --format="value(name)" | grep ${_PREFIX}  | grep  apigee-${_PREFIX}-trigger; then
+          echo "environment is already created with apigee. please don't rerun the trigger the trigger"
+          exit 1
+          else
+          echo "Creating TCP environment"
+          fi
+      elif [ "${_LB_TYPE}" = "tcp" ] && [ "${_APIGEE_REQUIRED}" = "false" ] && [ "${_SSL_PROXY}" = "true" ] ; then
+          echo "Creating TCP environment with SSL proxy"
+      else
+          echo "wrong input for apigee and lb type"
+          exit 1
+      fi
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: sh
+    id: Repo creation
+    args:
+    - '-c'
+    - | 
+      if gcloud artifacts repositories describe saas-cloud-build --location=${_REGION}; then
+        echo "Artifact Registry repository exists"
+      else
+        if [ "${_KMS_KEY_PATH}" = "null" ]; then
+          gcloud artifacts repositories create saas-cloud-build --repository-format=docker --location=${_REGION};
+        else
+          gcloud artifacts repositories create saas-cloud-build --repository-format=docker --location=${_REGION} --kms-key=${_KMS_KEY_PATH};
+        fi
+      fi
+    
+  - name: "gcr.io/cloud-builders/docker"
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest"
+      - "."
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest"
+
+  - name: "gcr.io/cloud-builders/docker"
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch/bank-of-anthos/src/frontend
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend:latest"
+      - "."
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend:latest"
+
+  - name: "gcr.io/cloud-builders/docker"
+    entrypoint: sh
+    args:
+      - '-c'
+      - |
+        if [ "${_APIGEE_REQUIRED}" = "true" ]; then
+          docker pull us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/frontend:v0.6.0@sha256:eaa077984dd8f741fc55cf75d4d3bb3f251ddb19d2b9c15cb3aea287826679d2
+          docker tag  us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/frontend:v0.6.0@sha256:eaa077984dd8f741fc55cf75d4d3bb3f251ddb19d2b9c15cb3aea287826679d2   ${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend-apigee:latest
+          docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend-apigee:latest
+        else
+          echo "skip frontend image creation"
+        fi
+  # - name: "gcr.io/cloud-builders/docker"
+  #   args:   
+  #     - "tag"
+  #     - "us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/frontend:v0.6.0@sha256:eaa077984dd8f741fc55cf75d4d3bb3f251ddb19d2b9c15cb3aea287826679d2"
+  #     - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend-apigee:latest"
+  
+  # - name: "gcr.io/cloud-builders/docker"
+  #   args:
+  #     - "push"
+  #     - "${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/frontend-apigee:latest"
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      sed  -e "s/REGION_NAME/${_REGION}/g" -e "s/ADMIN_REPOSITORY_NAME/${_ADMIN_REPOSITORY_NAME}/g" -e "s/ZONE_NAME/${_ZONE}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/LOGS_BUCKET_NAME_/${_LOGS_GCS_BUCKET_NAME}/g" -e "s/CUSTOMER_DOMAIN/${_SUB_DOMAIN}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  -e "s/CODE_REPOSITORY_NAME/${_REPO_NAME}/g" -e "s/TEMP_SEED_PROJECT_ID_/$PROJECT_ID/g" -e "s/REPO_BRANCH_NAME/${_BRANCH_NAME}/g" -e "s/APP_REPO_NAME_/${_APP_REPO_GCR_NAME}/g" -e "s/ADMIN_DOMAIN_/${_ADMIN_DOMAIN}/g" -e "s/VENDOR_EMAIL_ID_/${_VENDOR_EMAIL_ID}/g" -e "s/LOADBALANCER_TYPE/${_LB_TYPE}/g" -e "s/PRE__REQ__REGION/${_REGION}/g" -e "s/APIGEE_REQUIRED/${_APIGEE_REQUIRED}/g" -e "s/SSL__PROXY/${_SSL_PROXY}/g" -e "s/APP_PORT/${_APPLICATION_PORT}/g" -e "s|CMEK_KEY_PATH|${_KMS_KEY_PATH}|g" terraform.tfvars.tpl > terraform.tfvars;
+      sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g"  -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+      sed  -e "s/APIGEE_REQUIRED/${_APIGEE_REQUIRED}/g" apigee.tf.tpl > apigee.tf
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform plan  
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/cloud-build-with-branch
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'host-projects-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY    
+timeout: 86400s     
+
+                       

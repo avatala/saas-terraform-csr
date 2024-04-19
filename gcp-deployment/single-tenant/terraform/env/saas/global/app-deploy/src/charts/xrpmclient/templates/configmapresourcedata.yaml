@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xrsimulatorconfig-resourcedata
+  labels:
+    {{- include "xrpmclient.labels" . | nindent 4 }}
+data:
+
+  resourcedata.yaml: |
+     {{- include "xrpmclient.resourceDataConfig" . | nindent 4 -}}

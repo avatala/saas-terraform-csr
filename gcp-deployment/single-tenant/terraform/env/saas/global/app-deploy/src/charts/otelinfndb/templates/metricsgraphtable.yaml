@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: metricsgraph-table
+  labels:
+    grafana_dashboard: "1"
+data:
+  meetrics_graph_table.json: |-
+    {{- $.Files.Get "dashboards/metricsgraph_table.json"  | nindent 4 -}}

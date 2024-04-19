@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: device-inventory
+  labels:
+    grafana_dashboard: "1"
+data:
+  device_inventory.json: |-
+    {{- $.Files.Get "dashboards/deviceinventory.json"  | nindent 4 -}}

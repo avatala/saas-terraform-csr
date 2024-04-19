@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "DomainManager.device-aggregator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+    {{- with .Values.da.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.da.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.da.replicas }}
+  selector:
+    matchLabels:
+       {{- include "DomainManager.device-aggregator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.da.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "DomainManager.device-aggregator.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.da.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.da.rbac.enabled }}
+      serviceAccountName: {{ .Values.da.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.da.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.da.restartPolicy }}
+      initContainers:
+        - name: check-mongodb-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mongodb service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.da.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBSrvAddr" .) | quote}}
+        - name: check-nats-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for nats service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.da.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}          
+        - name: check-temporal-service
+          image: {{  .Values.global.images.initContainers.temporalAdminTools  | default  ( include "DomainManager.temporal-admin-tools.image" .) | quote}}
+          command: ['sh', '-c', 'until tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  cluster health; do echo waiting for temporal service; sleep 5; done;']
+          env: 
+            - name: TEMPORAL_CLI_ADDRESS
+              value: {{ printf " " }}{{  .Values.da.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+          volumeMounts:
+            {{- with .Values.da.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        - name: check-temporal-service-2
+          image: {{  .Values.global.images.initContainers.temporalAdminTools  | default  ( include "DomainManager.temporal-admin-tools.image" .) | quote}}
+          command: ['sh', '-c', 'until tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  --namespace ipm namespace describe; do tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  --namespace ipm namespace register; sleep 5; done;']
+          env: 
+            - name: TEMPORAL_CLI_ADDRESS
+              value: {{ printf " " }}{{  .Values.da.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+          volumeMounts:
+            {{- with .Values.da.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        - name: check-jetstream-stream-cm
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "DomainManager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "^CM\\n" ]]; do echo waiting for nats stream CM to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.da.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.da.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}   
+      containers:
+        - name: {{ .Values.da.name }}
+          image: {{ include "DomainManager.device-aggregator.image" . | quote }}
+          imagePullPolicy: {{ .Values.da.image.pullPolicy }}
+          ports:
+            - name: da-port
+              containerPort: {{ .Values.da.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.da.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- with .Values.da.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}  
+            {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}   
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.da.name  }}-configmap
+      restartPolicy: {{ .Values.da.restartPolicy }}
+
+      volumes:
+        {{- with .Values.da.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+status: {}

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "DomainManager.fullname" . }}-test-connection"
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: {{ include "DomainManager.busybox.image" . | quote }}
+      command: ['wget']
+      args: ['{{ include "DomainManager.fullname" . }}:{{ .Values.service.port }}']
+  restartPolicy: Never

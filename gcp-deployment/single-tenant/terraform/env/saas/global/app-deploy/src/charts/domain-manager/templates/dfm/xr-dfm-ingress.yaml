@@ -1,0 +1,43 @@
+{{- if .Values.hms.ingress.enabled -}}
+{{- $ := . -}}
+{{- $fullName := include "DomainManager.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}.{{ .Values.dfm.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+  annotations:
+  {{- with .Values.da.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "DomainManager.common-ingress.annotations" $ | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.global.ingress.ingressClassName }}
+  tls:
+  {{- range $i, $val := .Values.global.ingress.tls }}
+    - hosts:
+      {{- range $j, $host := $val.hosts }}
+        - {{ $host }}
+      {{- end }}
+      secretName: dm-domain-manager-tls-certs
+  {{- end }}
+  rules:
+    {{- range $host := .Values.global.ingress.hosts }}
+    - host: {{ $host }}
+      http:
+        paths:
+          {{- range $.Values.dfm.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .backend.service.name }}
+                port:
+                  number: 8080
+          {{- end }}
+    {{- end }}
+{{- end }}
+

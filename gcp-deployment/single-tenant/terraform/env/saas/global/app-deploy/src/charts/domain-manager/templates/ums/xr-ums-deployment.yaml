@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "DomainManager.user-manager.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+    {{- with .Values.ums.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.ums.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.ums.replicas }}
+  selector:
+    matchLabels:
+       {{- include "DomainManager.user-manager.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.ums.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "DomainManager.user-manager.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.ums.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.ums.rbac.enabled }}
+      serviceAccountName: {{ .Values.ums.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.ums.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.ums.restartPolicy }}
+            {{- if .Values.ums.initContainersTpl }}
+      initContainers:
+            {{- tpl .Values.ums.initContainersTpl . | nindent 8 }}
+            {{- end }}
+
+      containers:
+        - name: {{ .Values.ums.name }}
+          image: {{ include "DomainManager.user-manager.image" . | quote }}
+          imagePullPolicy: {{ .Values.ums.image.pullPolicy }}
+          ports:
+            - name: ums-port
+              containerPort: {{ .Values.ums.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.ums.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.ums.name  }}-configmap
+      restartPolicy: {{ .Values.ums.restartPolicy }}
+
+      volumes:
+        - name: {{ .Values.ums.config.volume }}
+          configMap:
+            name: {{ include "DomainManager.user-manager.configName" . }}
+        {{- with .Values.ums.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+status: {}

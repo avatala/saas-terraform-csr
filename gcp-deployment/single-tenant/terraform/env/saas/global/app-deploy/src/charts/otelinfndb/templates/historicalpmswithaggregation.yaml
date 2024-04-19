@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: historical-pms-aggregation
+  labels:
+    grafana_dashboard: "1"
+data:
+  historical_pms_aggregation.json: |-
+    {{- $.Files.Get "dashboards/Historical PMs with aggregation - per device.json"  | nindent 4 -}}

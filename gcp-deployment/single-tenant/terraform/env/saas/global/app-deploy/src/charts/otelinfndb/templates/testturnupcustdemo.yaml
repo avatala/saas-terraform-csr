@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: test-turnup-cust-demo
+  labels:
+    grafana_dashboard: "1"
+data:
+  test_turnup_cust.json: |-
+    {{- $.Files.Get "dashboards/test_turnup_cust_demo.json"  | nindent 4 -}}

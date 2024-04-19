@@ -1,0 +1,2412 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB-FLUX",
+      "label": "InfluxDB-Flux",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "alertlist",
+      "name": "Alert list",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.1.1"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "state-timeline",
+      "name": "State timeline",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "text",
+      "name": "Text",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 88,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 8,
+            "x": 0,
+            "y": 41
+          },
+          "id": 87,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "## Module Turn up diagnostics procedure\n\n#### Verify Module Status\nModule temperature must be within the range.\n - Modue case temperature >= -5 C and <= 75 C Carrier\n - Module Laser temperature >= 35 C and <= 65 C\n\n#### Verify Line Status \n - Carrier TX Power\n    - If carrier frequency is configured and laser is enabled then TX power must be within the configred Carrier Launch Power Target.\n    - Device Limit depends on the PON type and P2P vs. P2MP configuration: -36dBm to +3dBm\n  - Carrier RX Power\n    - Depends on the number of received DSCs \n    - Device Limit: -24 to +1 dBm\n  - Total Band RX Power\n    - This is dependent on the number of carriers in the Band\n    - Device Limit: -24 dBm to +4 dBm\n\n\n \n",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.1.1",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 8,
+            "x": 8,
+            "y": 41
+          },
+          "id": 89,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "## Capacity Turn up diagnostics procedure\n\n#### DSC Status Definition\nDSC Receive States: \n - Not Configured - DSC is not configured and not turned up \n - Powered Down - DSC is configured but not in use/receiving any power\n - Not Acquired - DSC is in use but signal is not acquired\n - OK - DSC signal is acquired\n\n\n#### Verify DSC Receive Status \n - DSC Status must be in Acquired State\n - PreFEC BER must be better than 1.3x10-2 (better than 6.9 dB Q)\n - Failed FEC Frames and Uncorrectd code words must be 0\n - postFECBER must be 0 (in other words postFECQ > 30 dB)\n - Per DSC receive power - TBD\n\n\n#### Verify DSC Trnsmit Status \n - DSC TX Power - TBD - is this PM supported\n \n",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.1.1",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 8,
+            "x": 16,
+            "y": 41
+          },
+          "id": 90,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "## Service Turn up diagnostics procedure\n\n#### GigE Client Status\n - Service is configured, \n    - At the Client Transmit side TX Octets must be non-zero and Errored octets must be zero\n    - At the Client Receive side RX Octets must be non-zero and Errored octets must be zero\n\n",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.1.1",
+          "type": "text"
+        }
+      ],
+      "title": "Test and Turn up Guide",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 85,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "sn"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Serial Number"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "di"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Device ID"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "dt"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Device Type"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "network"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Network ID"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "role"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Role"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 11,
+            "x": 0,
+            "y": 10
+          },
+          "id": 84,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "10.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.lineptp.laser_temp\")\r\n  |> filter(fn:(r) => r[\"_field\"] == \"gauge\")\r\n  |> filter(fn: (r) => r[\"network\"] =~ /^${nw:regex}$/)\r\n  |> last()\r\n    |> keep(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"])\r\n  |> group(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"], mode:\"by\")",
+              "refId": "A"
+            }
+          ],
+          "title": "Devices",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "di": 1,
+                  "dt": 2,
+                  "role": 3,
+                  "sn": 0
+                },
+                "renameByName": {
+                  "di": "Device ID",
+                  "dt": "Device Type",
+                  "network": "Network ID",
+                  "role": "Role",
+                  "sn": "Serial #"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.lineptp.case_temp"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Case Temp  (${__field.labels.sn})"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.lineptp.laser_temp"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Laser Temp  (${__field.labels.sn})"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.lineptp.wavelocker_temp"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Wavelocker Temp  (${__field.labels.sn})"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 11,
+            "y": 10
+          },
+          "id": 86,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "min",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Min",
+              "sortDesc": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /temp/)\r\n    |> filter(fn: (r) => r[\"sn\"] =~ /^${rxsn:regex}$/ or r[\"sn\"] =~ /^${txsn:regex}$/)\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            }
+          ],
+          "title": "Temperature",
+          "transformations": [],
+          "type": "timeseries"
+        }
+      ],
+      "title": "Module Status",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 79,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 3,
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.carrier.frequency_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "TX Frequency  (${__field.labels.sn})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "rotmhz"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 19,
+            "x": 0,
+            "y": 11
+          },
+          "id": 99,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /r.frequency/)\r\n    |> filter(fn: (r) => r[\"di\"] =~ /^${di:regex}/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            }
+          ],
+          "title": "TX Frequency",
+          "transformations": [],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.lineptp.opt_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "Tx Carrier Power (${__field.labels.sn})"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.lineptp.opr_rx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Rx Band Power  (${__field.labels.sn})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.carrier.coherent_signal_power_rx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Rx Carrier Power (${__field.labels.sn})"
+                  },
+                  {
+                    "id": "unit"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 19,
+            "x": 0,
+            "y": 17
+          },
+          "id": 80,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "min",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.lineptp.opt_tx_ne\" and r[\"sn\"] =~ /^${txsn:regex}$/) or (r[\"_measurement\"] == \"xr.lineptp.opr_rx_ne\" and r[\"sn\"] =~ /^${rxsn:regex}$/) or (r[\"_measurement\"] == \"xr.carrier.coherent_signal_power_rx_ne\" and r[\"sn\"] =~ /^${rxsn:regex}$/))\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            }
+          ],
+          "title": "TX and RX Power",
+          "transformations": [],
+          "type": "timeseries"
+        }
+      ],
+      "title": "Line Status",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 63,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "continuous-GrYlRd"
+              },
+              "custom": {
+                "fillOpacity": 70,
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineWidth": 0,
+                "spanNulls": false
+              },
+              "displayName": "${__field.labels.aid}",
+              "mappings": [
+                {
+                  "options": {
+                    "Acquired": {
+                      "color": "green",
+                      "index": 3
+                    },
+                    "Not Acquired": {
+                      "color": "blue",
+                      "index": 1
+                    },
+                    "Not Configured": {
+                      "color": "yellow",
+                      "index": 2
+                    },
+                    "Powered Down": {
+                      "color": "red",
+                      "index": 0
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 6,
+            "x": 0,
+            "y": 12
+          },
+          "id": 91,
+          "options": {
+            "alignValue": "left",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "mergeValues": true,
+            "rowHeight": 0.9,
+            "showValue": "auto",
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\r\n |> filter(fn: (r) => r[\"sn\"] =~ /^${rxsn:regex}$/)\r\n |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.dsc.pre_fec_ber_rx_ne\")\r\n\r\n  |> map(      \r\n    fn: (r) => ({r with\r\n        state: if r._value == 0.5 then \"Not Configured\"\r\n        else if r._value == 0.151693 then \"Powered Down\"\r\n        else if r._value == 0.144742 then \"Not Acquired\"\r\n        else \"Acquired\"\r\n\r\n    }))\r\n      |> drop(columns: [\"_value\"])\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            }
+          ],
+          "title": "DSC - State - ",
+          "type": "state-timeline"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "sci"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.dsc.1m.pre_fec_ber_rx_ne_avg"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "Pre-FEC BER  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "sci"
+                  },
+                  {
+                    "id": "custom.scaleDistribution",
+                    "value": {
+                      "log": 10,
+                      "type": "log"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.dsc.1m.pre_fec_q_rx_ne_avg"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Pre-FEC Q  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 18,
+            "x": 6,
+            "y": 12
+          },
+          "id": 92,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"sn\"] =~ /^${rxsn:regex}$/)\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.dsc.1m.pre_fec_ber_rx_ne_avg\" and r._value != 0.5 and r._value != 0.151693 and r._value != 0.144742) or (r[\"_measurement\"] == \"xr.dsc.1m.pre_fec_q_rx_ne_avg\" and r._value != 0 and r._value != 0.25 and r._value != 0.5))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "Pre-FEC BER and Q",
+          "transformations": [],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.dsc.1m.post_fec_ber_rx_ne_avg"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "Post-FEC BER  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "sci"
+                  },
+                  {
+                    "id": "custom.scaleDistribution",
+                    "value": {
+                      "log": 10,
+                      "type": "log"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.dsc.1m.uncorrected_code_words_rx_ne_avg"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Uncorrected Code Words  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 20,
+            "x": 0,
+            "y": 21
+          },
+          "id": 93,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"sn\"] =~ /^${rxsn:regex}$/)\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.dsc.1m.post_fec_ber_rx_ne_avg\" and r._value != 0.5 and r._value != 0.151693 and r._value != 0.144742) or (r[\"_measurement\"] == \"xr.dsc.1m.uncorrected_code_words_rx_ne_avg\" and r._value > 0))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "Post-FEC BER and Uncorrected Code Words",
+          "transformations": [],
+          "type": "timeseries"
+        }
+      ],
+      "title": "DSC Status",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 82,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "TX Total Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.err_octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "TX Errored Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 5
+          },
+          "id": 95,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => (r[\"sn\"] =~ /^${txsn:regex}$/) or (r[\"sn\"] =~ /^${rxsn:regex}$/)  )\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.otu.errored_blocks_far_end_rx_fe\") or (r[\"_measurement\"] == \"xr.otu.errored_blocks_rx_ne\") or (r[\"_measurement\"] == \"xr.otu.propagation_delay_rx_ne\"))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "OTU -Line - Status",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {}
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "TX Total Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.err_octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "TX Errored Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 11,
+            "x": 12,
+            "y": 5
+          },
+          "id": 102,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => (r[\"sn\"] =~ /^${txsn:regex}$/) or (r[\"sn\"] =~ /^${rxsn:regex}$/)  )\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.otu.odu.errored_blocks_far_end_rx_fe\") or (r[\"_measurement\"] == \"xr.otu.odu.errored_blocks_rx_ne\"))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "ODU - Line - Status",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {}
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "TX Total Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.err_octets_tx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "TX Errored Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 10
+          },
+          "id": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"sn\"] =~ /^${txsn:regex}$/)\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.clientptp.octets_tx_ne\") or (r[\"_measurement\"] == \"xr.clientptp.err_octets_tx_ne\"))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "GigE Client TX Status",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {}
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "displayName": "${__field.labels.aid}/${__field.name}",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.octets_rx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "RX Total Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "xr.clientptp.1m.err_octets_rx_ne"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "RX Errored Octets  (${__field.labels.aid})"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 10
+          },
+          "id": 101,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "Name",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.0.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"sn\"] =~ /^${rxsn:regex}$/)\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => (r[\"_measurement\"] == \"xr.clientptp.octets_rx_ne\") or (r[\"_measurement\"] == \"xr.clientptp.err_octets_rx_ne\"))\r\n\r\n  |> aggregateWindow(every: ${interval}, fn: mean)\r\n      |> pivot(rowKey: [\"_time\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n  |> yield(name: \"mean\")",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "hide": true,
+              "query": "from (table: stream A)\r\n",
+              "refId": "B"
+            }
+          ],
+          "title": "GigE Client RX Status",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {}
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "center",
+                "cellOptions": {
+                  "type": "color-text"
+                },
+                "inspect": false
+              },
+              "displayName": "${__field.name:regexReplaceAll((\\.\\w+)$, \"$1\")}",
+              "mappings": [
+                {
+                  "options": {
+                    "-55": {
+                      "color": "red",
+                      "index": 0,
+                      "text": "Not Set"
+                    },
+                    "not acquired": {
+                      "color": "red",
+                      "index": 4
+                    },
+                    "not configured": {
+                      "color": "blue",
+                      "index": 2
+                    },
+                    "ok": {
+                      "color": "green",
+                      "index": 1
+                    },
+                    "powered down": {
+                      "color": "orange",
+                      "index": 3
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 22,
+            "x": 0,
+            "y": 16
+          },
+          "id": 103,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "frameIndex": 4,
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": false,
+                "displayName": "sn"
+              }
+            ]
+          },
+          "pluginVersion": "10.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\" or r[\"_field\"] == \"counter\")\r\n  |> filter(fn: (r) => r[\"sn\"] =~ /^${txsn:regex}$/)\r\n  |> filter(fn: (r) => r[\"aid\"] =~ /^${aids:regex}$/)\r\n  |> filter(fn: (r) => r[\"rt\"] == \"clientptp\")\r\n  |> sort(columns: [\"_time\"], desc: true)\r\n  |> last()\r\n  |> pivot(rowKey: [\"_time\", \"aid\"], columnKey: [\"_measurement\"], valueColumn: \"_value\")\r\n\r\n\r\n\r\n",
+              "refId": "A"
+            }
+          ],
+          "title": "GigE Client - All PMs Last Record",
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {
+                "keepLabels": [
+                  "aid",
+                  "sn"
+                ],
+                "valueLabel": "_field"
+              }
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "_time": 0,
+                  "aid": 2,
+                  "sn": 1,
+                  "xr.clientptp.crc_aligned_err_rx_ne": 3,
+                  "xr.clientptp.crc_aligned_err_tx_ne": 4,
+                  "xr.clientptp.err_octets_rx_ne": 5,
+                  "xr.clientptp.err_octets_tx_ne": 6,
+                  "xr.clientptp.err_packets_rx_ne": 7,
+                  "xr.clientptp.err_packets_tx_ne": 8,
+                  "xr.clientptp.fec_ser": 9,
+                  "xr.clientptp.fragments_rx_ne": 10,
+                  "xr.clientptp.fragments_tx_ne": 11,
+                  "xr.clientptp.jabbers_rx_ne": 12,
+                  "xr.clientptp.jabbers_tx_ne": 13,
+                  "xr.clientptp.octets_rx_ne": 14,
+                  "xr.clientptp.octets_tx_ne": 15,
+                  "xr.clientptp.packets_rx_ne": 16,
+                  "xr.clientptp.packets_tx_ne": 17,
+                  "xr.clientptp.pcs_errored_blocks_rx_ne": 18,
+                  "xr.clientptp.pcs_errored_blocks_tx_ne": 19,
+                  "xr.clientptp.size_1024to1518_rx_ne": 20,
+                  "xr.clientptp.size_1024to1518_tx_ne": 21,
+                  "xr.clientptp.size_128to255_rx_ne": 22,
+                  "xr.clientptp.size_128to255_tx_ne": 23,
+                  "xr.clientptp.size_1519toJumbo_rx_ne": 24,
+                  "xr.clientptp.size_1519toJumbo_tx_ne": 25,
+                  "xr.clientptp.size_256to511_rx_ne": 26,
+                  "xr.clientptp.size_256to511_tx_ne": 27,
+                  "xr.clientptp.size_512to1023_rx_ne": 28,
+                  "xr.clientptp.size_512to1023_tx_ne": 29,
+                  "xr.clientptp.size_65to127_rx_ne": 30,
+                  "xr.clientptp.size_65to127_tx_ne": 31,
+                  "xr.clientptp.strobe_count": 32
+                },
+                "renameByName": {
+                  "_time": "Time",
+                  "aid": "AID",
+                  "xr.clientptp.1m.crc_aligned_err_rx_ne": "",
+                  "xr.otu.odu.errored_blocks_far_end_rx_fe": "Errored Blocks (FE)",
+                  "xr.otu.odu.errored_blocks_rx_ne": "Errored Blocks (NE)",
+                  "xr.otu.odu.errored_seconds_far_end_rx_fe": "Errored Seconds (FE)",
+                  "xr.otu.odu.errored_seconds_rx_ne": "Errored Seconds (NE)",
+                  "xr.otu.odu.severely_errored_seconds_far_end_rx_fe": "Severely Errored Seconds (FE)",
+                  "xr.otu.odu.severely_errored_seconds_rx_ne": "Severely Errored Seconds (NE)",
+                  "xr.otu.odu.unavailable_seconds_far_end_rx_fe": "Unavailable Seconds (FE)",
+                  "xr.otu.odu.unavailable_seconds_rx_ne": "Unavailable Seconds (NE)"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "title": "Service Status",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 98,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-Flux"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 14
+          },
+          "id": 97,
+          "options": {
+            "alertInstanceLabelFilter": "",
+            "alertName": "",
+            "dashboardAlerts": false,
+            "groupBy": [],
+            "groupMode": "default",
+            "maxItems": 20,
+            "sortOrder": 1,
+            "stateFilter": {
+              "error": true,
+              "firing": true,
+              "noData": false,
+              "normal": false,
+              "pending": true
+            },
+            "viewMode": "list"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "InfluxDB-Flux"
+              },
+              "refId": "A"
+            }
+          ],
+          "type": "alertlist"
+        }
+      ],
+      "title": "Threshold Crossing Alerts",
+      "type": "row"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"network\")",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "nw",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"network\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"network\"] == \"${nw}\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.lineptp.laser_temp\")\r\n  |> filter(fn:(r) => r[\"_field\"] == \"gauge\")\r\n  |> last()\r\n    |> keep(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"])\r\n  |> group(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"], mode:\"by\")\r\n|> keyValues(keyColumns: [\"sn\"]) |> map(fn: (r) => ({ _key: r._value }))",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "txsn",
+        "options": [],
+        "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"network\"] == \"${nw}\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.lineptp.laser_temp\")\r\n  |> filter(fn:(r) => r[\"_field\"] == \"gauge\")\r\n  |> last()\r\n    |> keep(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"])\r\n  |> group(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"], mode:\"by\")\r\n|> keyValues(keyColumns: [\"sn\"]) |> map(fn: (r) => ({ _key: r._value }))",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"network\"] == \"${nw}\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.lineptp.laser_temp\")\r\n  |> filter(fn:(r) => r[\"_field\"] == \"gauge\")\r\n  |> last()\r\n    |> keep(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"])\r\n  |> group(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"], mode:\"by\")\r\n|> keyValues(keyColumns: [\"sn\"]) |> map(fn: (r) => ({ _key: r._value }))",
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "name": "rxsn",
+        "options": [],
+        "query": "from(bucket: \"xr-1m\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"network\"] == \"${nw}\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"xr.lineptp.laser_temp\")\r\n  |> filter(fn:(r) => r[\"_field\"] == \"gauge\")\r\n  |> last()\r\n    |> keep(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"])\r\n  |> group(columns: [\"di\", \"dt\", \"sn\", \"role\", \"network\"], mode:\"by\")\r\n|> keyValues(keyColumns: [\"sn\"]) |> map(fn: (r) => ({ _key: r._value }))",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"di\")",
+        "hide": 2,
+        "includeAll": true,
+        "multi": true,
+        "name": "di",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"di\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "aids",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC1",
+            "value": "XR-L1-C1-DSC1"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC2",
+            "value": "XR-L1-C1-DSC2"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC3",
+            "value": "XR-L1-C1-DSC3"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC4",
+            "value": "XR-L1-C1-DSC4"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC5",
+            "value": "XR-L1-C1-DSC5"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC6",
+            "value": "XR-L1-C1-DSC6"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC7",
+            "value": "XR-L1-C1-DSC7"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC8",
+            "value": "XR-L1-C1-DSC8"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC9",
+            "value": "XR-L1-C1-DSC9"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC10",
+            "value": "XR-L1-C1-DSC10"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC11",
+            "value": "XR-L1-C1-DSC11"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC12",
+            "value": "XR-L1-C1-DSC12"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC13",
+            "value": "XR-L1-C1-DSC13"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC14",
+            "value": "XR-L1-C1-DSC14"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC15",
+            "value": "XR-L1-C1-DSC15"
+          },
+          {
+            "selected": false,
+            "text": "XR-L1-C1-DSC16",
+            "value": "XR-L1-C1-DSC16"
+          },
+          {
+            "selected": false,
+            "text": "1-1-1",
+            "value": "1-1-1"
+          },
+          {
+            "selected": false,
+            "text": "1-1-2",
+            "value": "1-1-2"
+          },
+          {
+            "selected": false,
+            "text": "1-1-3",
+            "value": "1-1-3"
+          },
+          {
+            "selected": false,
+            "text": "1-1-4",
+            "value": "1-1-4"
+          },
+          {
+            "selected": false,
+            "text": "1-1-5",
+            "value": "1-1-5"
+          },
+          {
+            "selected": false,
+            "text": "1-1-6",
+            "value": "1-1-6"
+          },
+          {
+            "selected": false,
+            "text": "1-1-7",
+            "value": "1-1-7"
+          },
+          {
+            "selected": false,
+            "text": "1-1-8",
+            "value": "1-1-8"
+          }
+        ],
+        "query": "XR-L1-C1-DSC1, XR-L1-C1-DSC2, XR-L1-C1-DSC3, XR-L1-C1-DSC4, XR-L1-C1-DSC5, XR-L1-C1-DSC6, XR-L1-C1-DSC7, XR-L1-C1-DSC8, XR-L1-C1-DSC9, XR-L1-C1-DSC10, XR-L1-C1-DSC11, XR-L1-C1-DSC12, XR-L1-C1-DSC13, XR-L1-C1-DSC14, XR-L1-C1-DSC15, XR-L1-C1-DSC16, 1-1-1,1-1-2,1-1-3,1-1-4,1-1-5,1-1-6,1-1-7,1-1-8",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "current": {
+          "selected": false,
+          "text": "1m",
+          "value": "1m"
+        },
+        "hide": 0,
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "1m",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "10m",
+            "value": "10m"
+          },
+          {
+            "selected": false,
+            "text": "30m",
+            "value": "30m"
+          },
+          {
+            "selected": false,
+            "text": "1h",
+            "value": "1h"
+          },
+          {
+            "selected": false,
+            "text": "6h",
+            "value": "6h"
+          },
+          {
+            "selected": false,
+            "text": "12h",
+            "value": "12h"
+          },
+          {
+            "selected": false,
+            "text": "1d",
+            "value": "1d"
+          },
+          {
+            "selected": false,
+            "text": "7d",
+            "value": "7d"
+          },
+          {
+            "selected": false,
+            "text": "14d",
+            "value": "14d"
+          },
+          {
+            "selected": false,
+            "text": "30d",
+            "value": "30d"
+          }
+        ],
+        "query": "1m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
+        "queryValue": "",
+        "refresh": 2,
+        "skipUrlSync": false,
+        "type": "interval"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.measurements(bucket: \"xr-1m\")",
+        "hide": 2,
+        "includeAll": false,
+        "multi": true,
+        "name": "metrics",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.measurements(bucket: \"xr-1m\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.tagKeys(bucket: \"xr-1m\")",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "attributes",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.tagKeys(bucket: \"xr-1m\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.measurements(bucket: \"xr-1m\")",
+        "hide": 2,
+        "includeAll": false,
+        "multi": true,
+        "name": "metrics_2",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.measurements(bucket: \"xr-1m\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"sn\", predicate: r.network == \"${nw}\")",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "copy_of_txsn",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"sn\", predicate: r.network == \"${nw}\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "InfluxDB-Flux"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"sn\")",
+        "hide": 2,
+        "includeAll": false,
+        "multi": true,
+        "name": "AllSn",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(bucket: \"xr-1m\", tag: \"sn\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Test and Turn up  cust demo",
+  "uid": "b81febe8-4779-4415-90f8-9a4be82c684f",
+  "version": 4,
+  "weekStart": ""
+}

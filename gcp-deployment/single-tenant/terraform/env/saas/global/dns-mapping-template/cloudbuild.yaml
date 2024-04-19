@@ -1,0 +1,227 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_APIGEE=${_APIGEE}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout ${_BRANCH_NAME}
+      if [ "${_APIGEE}" = "false"  ]; then
+        sed -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/REGION/$$_PRE_REQ_REGION/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+        sh script.sh
+        rm -rf script.sh
+      else
+        sed -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/REGION/$$_PRE_REQ_REGION/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+        sh appigee.sh
+        rm -rf appigee.sh
+      fi
+    secretEnv: ['_CLOUD_FUNCTION_URI','_PRE_REQ_REGION']
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+    args:
+    - '-c'
+    - |
+      if [ "${_APIGEE}" = "false"  ]; then 
+        gcip_login_url=$(gcloud secrets versions access latest --secret=${_PREFIX}_GCIP_LOGIN_URL)
+
+        single_tenant_idp_secret=$(gcloud secrets versions access latest --secret=${_CUSTOMER_NAME}-SINGLE_TENANT_IDP_SECRET)
+
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/
+        sed -e "s/GCIP__LOGIN__URL/$gcip_login_url/g" -e "s/VENDOR__EMAIL__ID/$$VENDOR_EMAIL_ID/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" -e "s/IDP__SECRET/`echo $single_tenant_idp_secret | awk -F'/' '{print $4}'`/g" idp-script.sh.tpl > idp-script.sh;
+        sh idp-script.sh
+        rm -rf idp-script.sh
+      else
+        echo "skip the IDP"
+      fi
+    secretEnv: ['_CLOUD_FUNCTION_URI', 'VENDOR_EMAIL_ID']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      cd gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/
+      if [ "${_APIGEE}" = "false"  ]; then
+        api_key=$(gcloud secrets versions access latest --secret=${_PREFIX}_API_KEY)
+
+        single_tenant_idp_secret=$(gcloud secrets versions access latest --secret=${_CUSTOMER_NAME}-SINGLE_TENANT_IDP_SECRET)
+
+        gcip_login_url=$(gcloud secrets versions access latest --secret=${_PREFIX}_GCIP_LOGIN_URL)
+
+        sed -e  "s/API__KEY/$api_key/g" -e "s/IDP__SECRET/`echo $single_tenant_idp_secret | awk -F'/' '{print $4}'`/g" -e "s/GCIP__LOGIN__URL/$gcip_login_url/g" SETTINGS_FILE.tpl > SETTINGS_FILE;
+
+        gcloud iap settings set SETTINGS_FILE --project=$$HOST_PROJECT_ID --resource-type=compute --service=${_CUSTOMER_NAME}-lb-backend
+
+        gcloud iap web enable --resource-type=backend-services --oauth2-client-id=$$FIREBASE_CLIENT_ID --oauth2-client-secret=$$FIREBASE_CLIENT_SECRET --service=${_CUSTOMER_NAME}-lb-backend --project=$$HOST_PROJECT_ID
+      else
+        echo "skip the iap setup for APIGEE"
+      fi
+    secretEnv: ['HOST_PROJECT_ID','FIREBASE_CLIENT_ID','FIREBASE_CLIENT_SECRET']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/$$_CUSTOMER_NAME/g" gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "$$_CUSTOMER_EMAIL"
+        git config --global user.name "$$_CUSTOMER_NAME"
+        git commit -m "client $$_CUSTOMER_NAME's DNS mapping deleted"
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+    secretEnv: ['_CUSTOMER_EMAIL', '_CUSTOMER_NAME']
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        sleep 900
+    id: 'Sleep for 15 minutes'
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git config --global user.email "$$_CUSTOMER_EMAIL"
+      git config --global user.name "$$_CUSTOMER_NAME"
+      mkdir -p gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping/
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping/terraform.tfvars
+      for f in $(find gcp-deployment/single-tenant/terraform/env/saas/global/dns-mapping-template/ -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping/$(basename $f)"; done
+      git add .
+      git commit -m "client $$_CUSTOMER_NAME's dns mapping created"
+      git push --set-upstream origin ${_BRANCH_NAME}
+    secretEnv: ['_CUSTOMER_EMAIL', '_CUSTOMER_NAME', '_CUSTOMER_REGION', '_TENANT_ID', 'TF_STATE_BUCKET_NAME', 'PREFIX','_FREEMIUM_SUB_DOMAIN', '_ENTERPRISE_SUB_DOMAIN']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping
+        terraform init
+    id: terraform init
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME']
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME']
+    
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME']
+    
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    args:
+      - '-c'
+      - |
+        cd gcp-deployment/single-tenant/terraform/env/saas/global/$$_CUSTOMER_NAME-dns-mapping
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+    secretEnv: ['_CUSTOMER_NAME']
+    
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        if [ "${_APIGEE}" = "false"  ]; then
+          gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-iap-saas-trigger --branch=${_BRANCH_NAME} --region $$_CUSTOMER_REGION
+        else
+          gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-metrics-scope-trigger --branch=${_BRANCH_NAME} --region $$_CUSTOMER_REGION
+        fi
+    id: 'trigger next build'
+    secretEnv: ['_CUSTOMER_REGION']
+  
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_EMAIL/versions/latest
+    env: _CUSTOMER_EMAIL
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-TENANT_ID/versions/latest
+    env: _TENANT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-TF_STATE_BUCKET_NAME/versions/latest
+    env: TF_STATE_BUCKET_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-PREFIX/versions/latest
+    env: PREFIX
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_SUB_DOMAIN/versions/latest
+    env: _FREEMIUM_SUB_DOMAIN
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: _ENTERPRISE_SUB_DOMAIN
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PRE_REQ_REGION/versions/latest
+    env: _PRE_REQ_REGION
+  # - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-SINGLE_TENANT_IDP_SECRET/versions/latest
+  #   env: SINGLE_TENANT_IDP_SECRET
+  # - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_GCIP_LOGIN_URL/versions/latest
+  #   env: _GCIP_LOGIN_URL
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_HOST_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  # - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_API_KEY/versions/latest
+  #   env: "API_KEY"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FIREBASE_CLIENT_ID/versions/latest
+    env: 'FIREBASE_CLIENT_ID'
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FIREBASE_CLIENT_SECRET/versions/latest
+    env: 'FIREBASE_CLIENT_SECRET'  
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_VENDOR_EMAIL_ID/versions/latest
+    env: "VENDOR_EMAIL_ID"
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+  workerPool:
+    'projects/${_PREFIX}-anthos-hub/locations/${_PRE_REQ_REGION}/workerPools/${_PREFIX}-private-worker-pool'
+timeout: 86400s

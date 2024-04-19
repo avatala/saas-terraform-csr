@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aggregation-manager.aggregation-fault-management.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "aggregation-manager.labels" . | nindent 4 }}
+      {{- with .Values.afm.service.labels }}
+      {{- . | toYaml | nindent 4 }}
+      {{- end }}
+spec:
+  type: {{ .Values.afm.service.type | default "ClusterIP" }}
+  ports:
+  - name: afm-port
+    port: {{ .Values.afm.port | default "8080" }}
+    targetPort: afm-port
+  selector:
+   {{- include "aggregation-manager.aggregation-fault-management.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.dcd.name  }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+
+
+ 
+  HTTP_PORT: {{ printf " " }}{{- include  "aggregation-manager.device-configuration-distributor.port" . | quote}}
+  {{- if .Values.dcd.config.ExecutorQueueSize }}
+  EXECUTOR_QUEUE_SIZE:  {{ printf " " }}{{ .Values.dcd.config.ExecutorQueueSize | quote }}
+  {{- end }}
+  {{- if .Values.dcd.config.JsMacAckPending }}
+  JS_MAX_ACK_PENDING: {{ printf " " }}{{ .Values.dcd.config.JsMacAckPending | quote }}
+  {{- end }}
+  {{- if .Values.dcd.config.jsAckWait }}
+  JS_ACK_WAIT: {{ printf " " }}{{ .Values.dcd.config.jsAckWait | quote }}
+  {{- end }}
+  {{- if .Values.dcd.config.logLevel }}
+  LOG_LEVEL: {{ printf " " }}{{ .Values.dcd.config.logLevel | quote }}
+  {{- end }}
+
+
+
+  #MQTT configurations
+  FAULT_MQTT_SERVER:  {{ printf " " }}{{  .Values.dcd.config.mqtt.fault.uri  | default  ( include "aggregation-manager.mqttExtAddr" .) | quote}}
+  TELEMETRY_MQTT_SERVER:  {{ printf " " }}{{  .Values.dcd.config.mqtt.telemetry.uri  | default  ( include "aggregation-manager.mqttExtAddr" .) | quote}}
+  {{- if .Values.dcd.config.mqtt.fault.port }}
+  FAULT_MQTT_PORT: {{ printf " " }}{{ .Values.dcd.config.mqtt.fault.port | quote }}
+  {{- end }}
+  {{- if .Values.dcd.config.mqtt.telemetry.port }}
+  TELEMETRY_MQTT_PORT: {{ printf " " }}{{ .Values.dcd.config.mqtt.telemetry.port | quote }}
+  {{- end }}
+  {{- if .Values.dcd.config.mqtt.fault.kai }}
+  FAULT_KAI: {{ printf " " }}{{ .Values.dcd.config.mqtt.fault.kai | quote }}
+  {{- end }}
+    {{- if .Values.dcd.config.mqtt.telemetry.kai }}
+  TELEMETRY_KAI: {{ printf " " }}{{ .Values.dcd.config.mqtt.telemetry.kai | quote }}
+  {{- end }}
+
+  # Keycloak
+  ISSUER_URL: {{ printf " " }}{{- include  "aggregation-manager.keycloakAddr" . | quote}}
+  # PLGD HUB access configurations
+  PLGD_GRPC_GW: {{ printf " " }}{{- include  "aggregation-manager.plgdGRPCgw" . | quote}}
+  PLGD_JETSTREAM: {{ printf " " }}{{  .Values.dcd.clients.jetstream.uri  | default  ( include "aggregation-manager.jetstreamAddr" .) | quote}}
+  caPool: {{  .Values.dcd.clients.jetstream.tls.caPool  |  quote }}
+  keyFile: {{  .Values.dcd.clients.jetstream.tls.keyFile  |  quote }}
+  certFile:  {{  .Values.dcd.clients.jetstream.tls.certFile  |  quote }}
+
+  #Jetstream
+  NATS_JETSTREAM:  {{ printf " " }}{{  .Values.dcd.clients.jetstream.uri  | default  ( include "aggregation-manager.jetstreamAddr" .) | quote}}
+  JETSTREAM_TLS_ENABLED: "true"
+  JETSTREAM_TLS_CA: {{  .Values.dcd.clients.jetstream.tls.caPool  |  quote }}
+  JETSTREAM_TLS_KEY: {{  .Values.dcd.clients.jetstream.tls.keyFile  |  quote }}
+  JETSTREAM_TLS_CERT:  {{  .Values.dcd.clients.jetstream.tls.certFile  |  quote }}
+  
+  #MongoDB
+  MONGO_DB_ADDR:  {{ printf " " }}{{  .Values.dcd.clients.mongoDB.uri  | default  ( include "aggregation-manager.mongoDBAddr" .) | quote}}
+  MONGO_TLS_ENABLED: "true"
+  MONGO_TLS_CA: {{  .Values.dcd.clients.mongoDB.tls.caPool  |  quote }}
+  MONGO_TLS_KEY: {{  .Values.dcd.clients.mongoDB.tls.keyFile  |  quote }}
+  MONGO_TLS_CERT:  {{  .Values.dcd.clients.mongoDB.tls.certFile  |  quote }}
+
+
+  #Open Telemetry
+  {{- if .Values.global.clients.openTelemetry.uri }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.uri | quote }}
+  OPEN_TELEMETRY_TLS_ENABLED: "true"
+  OPEN_TELEMETRY_TLS_CA: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.caPool | quote }}
+  OPEN_TELEMETRY_TLS_CERT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.certFile | quote }}
+  OPEN_TELEMETRY_TLS_KEY: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.keyFile | quote }}
+  {{- end }}

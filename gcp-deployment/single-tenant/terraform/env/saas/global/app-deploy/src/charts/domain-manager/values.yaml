@@ -1,0 +1,1944 @@
+# Default values for DomainManager.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+replicaCount: 1
+image:
+  registry: "registry.docker.io"
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.23.1"
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+# fsGroup: 2000
+
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+  postgres:
+    postgres_password: aW5maW5lcmEx
+    password: ZGJwYXNzd29yZA==
+    replication_password: ZGJwYXNzd29yZA==   
+  keycloak:
+    hosts:
+      - ipm.localhost
+  images:
+    initContainers:
+      busybox:
+      natsbox:
+      temporalAdminTools:
+  ssl:
+    enabled: true
+  ingress:
+    hosts:
+      - ipm.localhost
+    tls:
+      - hosts:
+          - ipm.localhost
+        secretName: ipm-ssl-certificate
+    ingressClassName: nginx
+  config:
+    # -- (bool) Verify the JWT token
+    verifyToken: true
+  # -- extra volumes for generic clients such as open telemetry
+  extraVolumes:
+  # -- extra volumes mounts for generic clients such as open telemetry
+  extraVolumeMounts:
+  clients:
+    openTelemetry:
+      # -- (string) uri for OpenTelemetry collector
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool:
+        # -- client private key in PEM format
+        keyFile:
+        # -- client public certificate in PEM format
+        certFile:
+tlsConfig:
+  useCertManager: true
+  selfSigned: true
+  loadTLS: false
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+cluster:
+  # -- Cluster internal DNS prefix
+  dns: cluster.local
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+resources: {}
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# limits:
+#   cpu: 100m
+#   memory: 128Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}
+namespace_inf: ipm-inf
+namespace_am: ipm-am
+namespace_keycloak: ipm-keycloak
+service_nats: inf-nats
+service_nats_am: am-nats
+service_grpc_gw: am-plgd-hub-grpc-gateway
+service_http_gw: am-plgd-hub-http-gateway
+service_oauth: am-plgd-hub-mock-oauth-server
+eg:
+  name: xr-eg
+  # -- Full name to override
+  fullnameOverride: xr-eg
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: event-gateway
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/eg
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-eg-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+  ingress:
+    fileName: xr-eg-ingress.yaml
+    enabled: true
+    className: ""
+    annotations:
+      nginx.org/websocket-services: "xr-eg"
+    paths:
+      - path: /api/v1/subscriptions/events
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-eg
+            port: eg-port
+      - path: /api/v1/subscriptions/alarms
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-eg
+            port: eg-port
+      - path: /eg
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-eg
+            port: eg-port
+      - path: /eg/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-eg
+            port: eg-port
+    tls: []
+hms:
+  name: xr-hms
+  # -- Full name to override
+  fullnameOverride: xr-hms
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: host-management-service
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/hms
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret        
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-hms-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-hms-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/hosts
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-hms
+            port: hms-port
+      - path: /hms
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-hms
+            port: hms-port
+      - path: /hms/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-hms
+            port: hms-port
+    tls: []
+da:
+  name: xr-da
+  # -- Full name to override
+  fullnameOverride: xr-da
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: device-aggregator
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    ExecutorQueueSize:
+    JsMacAckPending:
+    jsAckWait:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/da
+    # -- Image tag.
+    tag: v1.2.3-1
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-da-service.yaml
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-da-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /da
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-da
+            port: mi-port
+    tls: []
+mm:
+  name: xr-mm
+  # -- Full name to override
+  fullnameOverride: xr-mm
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: module-manager
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/mm
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-mm-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-mm-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/modules
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-mm
+            port: mm-port
+      - path: /mm
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-mm
+            port: mm-port
+      - path: /mm/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-mm
+            port: mm-port
+    tls: []
+ncs:
+  name: xr-ncs
+  # -- Full name to override
+  fullnameOverride: xr-ncs
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: network-connection-service
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/ncs
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-ncs-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-ncs-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/network-connections
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ncs
+            port: ncs-port
+      - path: /api/v1/acs
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ncs
+            port: ncs-port
+      - path: /api/v1/lcs
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ncs
+            port: ncs-port
+      - path: /ncs
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ncs
+            port: ncs-port
+      - path: /ncs/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ncs
+            port: ncs-port
+    tls: []
+ns:
+  name: xr-ns
+  # -- Full name to override
+  fullnameOverride: xr-ns
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: network-service
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/ns
+    # -- Image tag.
+    tag: v1.2.3-3
+    # -- Image pull policy    
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-ns-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-ns-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/xr-networks
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ns
+            port: ns-port
+      - path: /ns
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ns
+            port: ns-port
+      - path: /ns/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ns
+            port: ns-port
+    tls: []
+tc:
+  name: xr-tc
+  # -- Full name to override
+  fullnameOverride: xr-tc
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: transport-capacity
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/tc
+    # -- Image tag.
+    tag: v1.2.3-4
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-tc-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-tc-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/transport-capacities
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-tc
+            port: tc-port
+      - path: /api/v1/capacity-links
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-tc
+            port: tc-port
+      - path: /tc
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-tc
+            port: tc-port
+      - path: /tc/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-tc
+            port: tc-port
+    tls: []
+web:
+  name: web-gui
+  # -- Full name to override
+  fullnameOverride: web-gui
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: web-gui
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/web
+    # -- Image tag.
+    tag: 1.2.3-3
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumeMounts: {}
+  # -- Service configuration
+  config:
+    # -- Service configuration file
+    fileName: xr-web-gui-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  ingress:
+    fileName: xr-web-ui-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-gui
+            port: web-gui-port
+    tls: []
+swm:
+  name: xr-swm
+  fullnameOverride: xr-swm
+  replicas: 1
+  port: 8080
+  service:
+    type: ClusterIP
+    labels: {}
+  deploymentLabels: {}
+  deploymentAnnotations: {}
+  podLabels: {}
+  podAnnotations: {}
+  rbac:
+    enabled: false
+    serviceAccountName: software-manager
+    roleBindingDefinitionTpl:
+  securityContext: {}
+  restartPolicy: Always
+  initContainersTpl: {}
+  image:
+    registry: ghcr.io/infinera/
+    repository: "ipm/swm"
+    tag: "v1.2.3-2"
+    pullPolicy: IfNotPresent
+    imagePullSecrets: 
+    - name: "infn-registry"
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    maxConcurrentUpgrades: 20
+    # -- (int) Not required to be configured by user. No of maximum parallel upgrade task to be executed by SWM .
+    fileName: xr-swm-service.yaml
+    volume: config
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    fileName: xr-swm-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/sw
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-swm
+            port: swm-port
+      - path: /swm
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-swm
+            port: swm-port
+      - path: /swm/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-swm
+            port: swm-port
+    tls: []
+ndus:
+  name: xr-ndus
+  fullnameOverride: xr-ndus
+  replicas: 1
+  port: 8080
+  service:
+    type: ClusterIP
+    labels: {}
+  deploymentLabels: {}
+  deploymentAnnotations: {}
+  podLabels: {}
+  podAnnotations: {}
+  rbac:
+    enabled: false
+    serviceAccountName: ndu-service
+    roleBindingDefinitionTpl:
+  securityContext: {}
+  restartPolicy: Always
+  initContainersTpl: {}
+  image:
+    registry: ghcr.io/infinera/
+    repository: "ipm/ndus"
+    tag: "v1.2.3-3"
+    pullPolicy: IfNotPresent
+    imagePullSecrets: 
+    - name: "infn-registry"
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+    # -- extra volume for temporal tls secret            
+    - name: temporal-tls
+      secret:
+        secretName: temporal-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+    - name: temporal-tls
+      mountPath: /certs/temporal
+      readOnly: true
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    fileName: xr-ndus-service.yaml
+    volume: config
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+    temporal:
+      # -- (string) uri for Temporal server, defaults for deployed Temporal server from Domain Manager chart
+      uri:
+      # -- (string) default namespace to be used and created if inexistent
+      namespace: ipm
+      retry:
+        # -- (timeDuration) default temporal workflow options builder execution timeout value
+        executionTimeout:
+        # -- (int) default temporal retry policy builder maximum attempts value
+        maximumAttemps:
+        # -- (timeDuration) default temporal retry policy builder maximum interval value
+        maximumInterval:
+      workflow:
+        # -- (timeDuration)
+        executionTimeout:
+      child:
+        # -- (timeDuration) default temporal child workflow options builder execution timeout value
+        executionTimeout:
+      activity:
+        # -- (timeDuration) default temporal activity options builder start to close timeout value
+        startToCloseTimeout:
+      local:
+        # -- (timeDuration) default temporal local activity options builder start to close timeout value
+        startToCloseTimeout:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/temporal/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/temporal/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/temporal/tls.crt"
+  ingress:
+    filename: xr-ndus-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /api/v1/ndus
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ndus
+            port: ndus-port
+      - path: /ndus
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ndus
+            port: ndus-port
+      - path: /ndus/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ndus
+            port: ndus-port
+    tls: []
+ums:
+  name: xr-ums
+  fullnameOverride: xr-ums
+  replicas: 1
+  port: 8080
+  service:
+    type: ClusterIP
+    labels: {}
+  deploymentLabels: {}
+  deploymentAnnotations: {}
+  podLabels: {}
+  podAnnotations: {}
+  rbac:
+    enabled: false
+    serviceAccountName: user-manager
+    roleBindingDefinitionTpl:
+  securityContext: {}
+  restartPolicy: Always
+  initContainersTpl: {}
+  image:
+    registry: ghcr.io/infinera/
+    repository: "nm/ni/user-manager"
+    tag: "2.2.2-alpha.1"
+    pullPolicy: IfNotPresent
+    imagePullSecrets: 
+    - name: "infn-registry"
+  resources: {}
+  extraVolumeMounts: {}
+  config:
+    fileName: xr-ums-service.yaml
+    volume: config
+    mountPath: /config
+  ingress:
+    fileName: xr-ums-ingress.yaml
+    enabled: true
+    className: ""
+    paths:
+      - path: /user-manager
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-ums
+            port: ums-port
+    tls: []
+dfm:
+  name: xr-dfm
+  # -- Full name to override
+  fullnameOverride: xr-dfm
+  # -- Number of replicas
+  replicas: 1
+  port: 8080
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Labels for event_gateway service
+    labels: {}
+  # -- Additional labels for event_gateway deployment
+  deploymentLabels: {}
+  # -- Additional annotations for event_gateway deployment
+  deploymentAnnotations: {}
+  # -- Labels for event_gateway pod
+  podLabels: {}
+  # -- Annotations for event_gateway pod
+  podAnnotations: {}
+  rbac:
+    # -- Create RBAC config
+    enabled: false
+    # -- Name of event_gateway SA
+    serviceAccountName: domain-fault-management
+    # -- template definition for Role/binding etc..
+    roleBindingDefinitionTpl:
+  # -- Security context for pod
+  securityContext: {}
+  # -- Restart policy for pod
+  restartPolicy: Always
+  # -- Init containers definition. Resolved as template
+  initContainersTpl: {}
+  image:
+    # -- Image registry
+    registry: ghcr.io/infinera/
+    # -- Image repository
+    repository: ipm/dfm
+    # -- Image tag.
+    tag: v1.2.3-2
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+    # -- Image pull secrets
+    imagePullSecrets: 
+    - name: "infn-registry"
+  # -- Resources limit
+  resources: {}
+  # -- Optional extra volume mounts
+  extraVolumes:
+    # -- extra volume for nats tls secret
+    - name: nats-tls
+      secret:
+        secretName: nats-client-tls
+    # -- extra volume for mongoDB tls secret
+    - name: mongo-tls
+      secret:
+        secretName: mongodb-client-tls
+  # -- Optional extra volume mounts
+  extraVolumeMounts:
+    # -- extra volume mount for nats tls secret
+    - name: nats-tls
+      mountPath: /certs/jetstream
+      readOnly: true
+    # -- extra volume mount for mongoDB tls secret
+    - name: mongo-tls
+      mountPath: /certs/mongoDB
+      readOnly: true
+  # -- Service configuration
+  config:
+    #  -- (string) log level (one of debug, info, warn, error, dpanic, panic,fatal)
+    logLevel: debug
+    #  -- (int) JetStream max acknowledge pending messages per subscribed subject
+    JsMacAckPending:
+    #  -- (int) JetStream message acknowledge timeout
+    jsAckWait:
+    #  -- (int) number of threads processing jobs. Min value 1, Max value 1000
+    ExecutorQueueSize:
+    # -- Service configuration file
+    fileName: xr-dfm-service.yaml
+    # -- Service configuration volume name
+    volume: config
+    # -- Configuration mount path
+    mountPath: /config
+  clients:
+    jetstream:
+      # -- (string) uri for jetstream server, defaults for deployed Nats server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/jetstream/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/jetstream/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/jetstream/tls.crt"
+    mongoDB:
+      # -- (string) uri for MongoDB server, defaults for deployed MongoDB server from Infrastructure chart
+      uri:
+      tls:
+        # -- Root CA certificate in PEM format
+        caPool: "/certs/mongoDB/ca.crt"
+        # -- client private key in PEM format
+        keyFile: "/certs/mongoDB/tls.key"
+        # -- client public certificate in PEM format
+        certFile: "/certs/mongoDB/tls.crt"
+  ingress:
+    fileName: xr-dfm-ingress.yaml
+    enabled: true
+    className: ""
+    annotations:
+      nginx.org/websocket-services: "xr-dfm"
+    paths:
+      - path: /api/v1/alarmList
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dfm
+            port: dfm-port
+      - path: /api/v1/alarms
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dfm
+            port: dfm-port
+      - path: /api/v1/ietf-alarms:alarms
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dfm
+            port: dfm-port
+      - path: /dfm
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dfm
+            port: dfm-port
+      - path: /dfm/swagger
+        pathType: Prefix
+        backend:
+          service:
+            name: xr-dfm
+            port: dfm-port
+    tls: []
+temporal:
+  server:
+    additionalVolumes:
+      - name: sql-tls
+        secret:
+          secretName: sql-client-tls
+      - name: temporal-tls
+        secret:
+          secretName: temporal-server-tls
+    additionalVolumeMounts:
+      - name: sql-tls
+        mountPath: /certs/sql
+        readOnly: true
+      - name: temporal-tls
+        mountPath: /certs/temporal
+        readOnly: true
+    additionalToolEnvVars:
+      - name: TEMPORAL_CLI_TLS_CA
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_CLI_TLS_KEY
+        value: /certs/temporal/tls.key
+      - name: TEMPORAL_CLI_TLS_CERT
+        value: /certs/temporal/tls.crt
+      - name: TEMPORAL_CLI_TLS_DISABLE_HOST_VERIFICATION
+        value: 'true'
+      - name: TEMPORAL_CLI_TLS_ENABLE_HOST_VERIFICATION
+        value: 'false'
+    additionalWebEnvVars:
+      - name: TEMPORAL_TLS_CA_PATH
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_TLS_KEY_PATH
+        value: /certs/temporal/temporal-web.key
+      - name: TEMPORAL_TLS_CERT_PATH
+        value: /certs/temporal/temporal-web.crt
+      - name: TEMPORAL_NOTIFY_ON_NEW_VERSION
+        value: false
+      - name: TEMPORAL_TLS_ENABLE_HOST_VERIFICATION
+        value: 'false'
+    additionalEnv:
+      - name: TEMPORAL_CLI_TLS_CA
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_CLI_TLS_KEY
+        value: /certs/temporal/tls.key
+      - name: TEMPORAL_CLI_TLS_CERT
+        value: /certs/temporal/tls.crt
+      - name: TEMPORAL_CLI_TLS_ENABLE_HOST_VERIFICATION
+        value: 'false'
+      - name: TEMPORAL_TLS_SERVER_CA_CERT
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_TLS_FRONTEND_KEY
+        value: /certs/temporal/tls.key
+      - name: TEMPORAL_TLS_FRONTEND_CERT
+        value: /certs/temporal/tls.crt
+      - name: TEMPORAL_TLS_CLIENT1_CA_CERT
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_TLS_CLIENT2_CA_CERT
+        value: /certs/temporal/ca.crt
+      - name: TEMPORAL_TLS_SERVER_KEY
+        value: /certs/temporal/tls.key
+      - name: TEMPORAL_TLS_SERVER_CERT
+        value: /certs/temporal/tls.crt
+      - name: TEMPORAL_TLS_FRONTEND_DISABLE_HOST_VERIFICATION
+        value: 'true'
+      - name: TEMPORAL_TLS_INTERNODE_DISABLE_HOST_VERIFICATION
+        value: 'true'
+    config:
+      persistence:
+        default:
+          driver: "sql"
+          sql:
+            driver: "postgres"
+            host: inf-postgresql
+            port: 5432
+            database: temporal
+            user: dbusername
+            # for a production deployment use this instead of `password` and provision the secret beforehand e.g. with a sealed secret
+            # it has a single key called `password`
+            existingSecret: ipm-postgresql-secret
+            secretName: password
+            maxConns: 20
+            maxConnLifetime: "1h"
+          tls:
+            enabled: true
+            certFile: "/certs/sql/tls.crt"
+            keyFile: "/certs/sql/tls.key"
+            caFile: "/certs/sql/ca.crt"
+            enableHostVerification: true
+        visibility:
+          driver: "sql"
+          sql:
+            driver: "postgres"
+            host: inf-postgresql
+            port: 5432
+            database: temporal_visibility
+            user: dbusername
+            # for a production deployment use this instead of `password` and provision the secret beforehand e.g. with a sealed secret
+            # it has a single key called `password`
+            existingSecret: ipm-postgresql-secret
+            secretName: password
+            maxConns: 20
+            maxConnLifetime: "1h"
+          tls:
+            enabled: true
+            certFile: "/certs/sql/tls.crt"
+            keyFile: "/certs/sql/tls.key"
+            caFile: "/certs/sql/ca.crt"
+            enableHostVerification: true
+      tls:
+        internode:
+          server:
+            certFile: /certs/temporal/tls.crt
+            keyFile: /certs/temporal/tls.key
+            requireClientAuth: true
+            clientCaFiles:
+              - /certs/temporal/ca.crt
+          client:
+            serverName: ipm.localhost
+            rootCaFiles:
+              - /certs/temporal/ca.crt
+        frontend:
+          server:
+            certFile: /certs/temporal/tls.crt
+            keyFile: /certs/temporal/tls.key
+            requireClientAuth: true
+            clientCaFiles:
+              - /certs/temporal/ca.crt
+          client:
+            serverName: ipm.localhost
+            rootCaFiles:
+              - /certs/temporal/ca.crt
+  cassandra:
+    enabled: false
+  mysql:
+    enabled: false
+  postgresql:
+    enabled: true
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+  elasticsearch:
+    enabled: false
+  web:
+    enabled: false
+  schema:
+    setup:
+      enabled: false
+    update:
+      enabled: false

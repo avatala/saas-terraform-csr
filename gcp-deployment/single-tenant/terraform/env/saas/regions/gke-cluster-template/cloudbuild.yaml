@@ -1,0 +1,165 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_APIGEE=${_APIGEE}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout  ${_BRANCH_NAME}
+      if [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE}" = "false" ]; then
+        sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+        sh script.sh
+        rm -rf script.sh
+      elif [ "${_LB_TYPE}" = "http" ] && [ "${_APIGEE}" = "true" ]; then
+        sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+        sh appigee.sh
+        rm -rf appigee.sh
+      else
+        sed -e "s/REGION/$$_CUSTOMER_REGION/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script-tcp.sh.tpl > script-tcp.sh;
+        sh script-tcp.sh
+        rm -rf script-tcp.sh
+      fi
+    secretEnv: ['_CLOUD_FUNCTION_URI','_CUSTOMER_REGION']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    id: Remove Directory
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      sed  -e "s/CUSTOMER_NAME/$$_CUSTOMER_NAME/g" gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/setup.py.tpl > gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/setup.py;
+      python3 gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/setup.py 
+      git add .
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "There are changes";
+        git config --global user.email "$$_CUSTOMER_EMAIL"
+        git config --global user.name "$$_CUSTOMER_NAME"
+        git commit -m "client $$_CUSTOMER_NAME's GKE cluster deleted"
+        git push --set-upstream origin ${_BRANCH_NAME}
+      else
+        echo "No changes are there";
+        exit
+      fi
+    secretEnv: ['_CUSTOMER_EMAIL', '_CUSTOMER_NAME']
+  
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    entrypoint: 'bash'
+    env:
+    - "_KMS_KEY_PATH=${_KMS_KEY_PATH}"
+    - "_ACCELERATOR_COUNT=${_ACCELERATOR_COUNT}"
+    - "_ACCELERATOR_TYPE=${_ACCELERATOR_TYPE}"
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      git config --global user.email "$$_CUSTOMER_EMAIL"
+      git config --global user.name "$$_CUSTOMER_NAME"
+      mkdir -p gcp-deployment/single-tenant/terraform/env/saas/regions/$$_CUSTOMER_NAME-gke-cluster/
+      envsubst < gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/terraform.tfvars > gcp-deployment/single-tenant/terraform/env/saas/regions/$$_CUSTOMER_NAME-gke-cluster/terraform.tfvars
+      for f in $(find gcp-deployment/single-tenant/terraform/env/saas/regions/gke-cluster-template/ -regex '.*\.tf'); do envsubst < $f > "gcp-deployment/single-tenant/terraform/env/saas/regions/$$_CUSTOMER_NAME-gke-cluster/$(basename $f)"; done
+      git add .
+      git commit -m "client $$_CUSTOMER_NAME's gke cluster created"
+      git push --set-upstream origin ${_BRANCH_NAME}
+    secretEnv: ['_CUSTOMER_EMAIL', '_CUSTOMER_NAME', '_CUSTOMER_REGION','_MASTER_IP', 'TF_STATE_BUCKET_NAME', 'LOG_BUCKET_NAME', 'PREFIX' , '_ZONE' , '_MACHINE_TYPE' , '_MIN_COUNT' , '_MAX_COUNT' , '_NODE_COUNT','_PRE_REQ_REGION']
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/regions/${_CUSTOMER_NAME}-gke-cluster
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh
+  
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-gke-asm-acm-saas-trigger --branch=${_BRANCH_NAME} --region $$_PRE_REQ_REGION
+    id: 'trigger next build'
+    secretEnv: ['_PRE_REQ_REGION']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_EMAIL/versions/latest
+    env: _CUSTOMER_EMAIL
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-MASTER_IP/versions/latest
+    env: _MASTER_IP
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-TF_STATE_BUCKET_NAME/versions/latest
+    env: TF_STATE_BUCKET_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-LOG_BUCKET_NAME/versions/latest
+    env: LOG_BUCKET_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-ZONE/versions/latest
+    env: _ZONE
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-MACHINE_TYPE/versions/latest
+    env: _MACHINE_TYPE
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-MIN_COUNT/versions/latest
+    env: _MIN_COUNT
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-MAX_COUNT/versions/latest
+    env: _MAX_COUNT
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-NODE_COUNT/versions/latest
+    env: _NODE_COUNT
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-PREFIX/versions/latest
+    env: PREFIX
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PRE_REQ_REGION/versions/latest
+    env: _PRE_REQ_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY

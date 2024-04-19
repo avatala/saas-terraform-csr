@@ -1,0 +1,87 @@
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+config:
+  mqtt:
+    endpoint: "tcp://otelinfndb-emqx:1883"
+    client_id: "xr-pm-simulator-client"
+    username: admin
+    password: public
+    publish_metrics: false # will publish devices to mqtt create topics for PM sharding service, publish retained message and not publish pms metrics; when true publishes metrics too
+  publish:
+    uc_dir: zarf/uc/docker  #zarf/uc/testadddelete #zarf/uc/demo # zarf/uc/2k #zarf/uc/docker
+    devices:
+      enabled: true
+      qos: 1
+      retained: false
+      topic: ipm/telemetry/event/device #topic for device creation and deletions
+      publish_delete: false # this will publish only delete event for device and no add or metrics generation
+    pms:
+      enabled: true
+      init_delay: 5s
+      mqtt_topic: "ipm/1/mod/pm/" # this has to be appended with device id like ipm/1/mod/pm/c9062c28-740c-4d1a-7e86-cd2f7822e288 
+      pmtype: "HISTORIC" # HISTORIC|RAPID|ONDEMAND
+      rapidpmtime: 10 #this is in seconds
+  ipm:
+    enabled: false
+    hostname: keycloak-keycloakx-http.ipm-keycloak.svc.cluster.local #"xr-mm.ipm-dm.svc.cluster.local:8080" #in-4dna59-lx #10.220.4.59 
+    get_modules_end_point: http://xr-mm.ipm-dm.svc.cluster.local:8080/api/v1/modules?content=all
+    keycloak:
+      issuer_url: /realms/xr-cm
+      client_id: xr-web-client
+      client_secret: xr-web-client
+      realm: xr-cm
+    network_default_name: xr-network
+
+replicaCount: 1
+image:
+  repository: ipm/telemetry/xrpmclient
+  tag: v0.13.7
+  pullPolicy: IfNotPresent
+imagePullSecrets:
+  - name: infn-registry
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+nodeSelector: {}
+tolerations: []
+affinity: {}
+resourceDataConfig: {}

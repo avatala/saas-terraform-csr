@@ -1,0 +1,123 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    entrypoint: 'bash'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |
+      sed -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" -e "s/CODE_REPOSITORY_NAME/${_CSR_TERRAFORM_REPO_NAME}/g" -e "s/TEMP_SEED_PROJECT_ID_/$PROJECT_ID/g" -e "s/REPO_BRANCH_NAME/${_TERRAFORM_CODE_BRANCH_NAME}/g" -e "s/APP_REPO_NAME_/${_CSR_APP_REPO_NAME}/g" -e "s/VENDOR__EMAIL__ID/$$VENDOR_EMAIL_ID/g" -e "s/FREEMIUM__TRIGGER__ID/$$FREEMIUM_TRIGGER_ID/g" -e "s/FREEMIUM__TRIGGER__LOCATION/$$FREEMIUM_TRIGGER_LOCATION/g" -e "s/ENTERPRISE__TRIGGER__ID/$$ENTERPRISE_TRIGGER_ID/g" -e "s/ENTERPRISE__TRIGGER__LOCATION/$$ENTERPRISE_TRIGGER_LOCATION/g" -e "s/FREEMIUM__DELETE__TRIGGER__LOCATION/$$FREEMIUM_DELETE_TRIGGER_LOCATION/g" -e "s/ENTERPRISE__DELETE__TRIGGER__LOCATION/$$ENTERPRISE_DELETE_TRIGGER_LOCATION/g" -e "s/FREEMIUM__DELETE__TRIGGER__ID/$$FREEMIUM_DELETE_TRIGGER_ID/g" -e "s/ENTERPRISE__DELETE__TRIGGER__ID/$$ENTERPRISE_DELETE_TRIGGER_ID/g"  -e "s/ENTERPRISE__SUB__DOMAIN/$$ENTERPRISE_SUB_DOMAIN/g" -e "s/FREEMIUM__SUB__DOMAIN/$$FREEMIUM_SUB_DOMAIN/g" -e "s/FREEMIUM__PRJ__ID/$$FREEMIUM_PRJ_ID/g" -e "s/HOST_PROJECT/$$HOST_PROJECT_ID/g" -e "s/ANTHOS_PROJECT/$$ANTHOS_PRJ_ID/g" -e "s/FREEMIUM_UPDATE_ID/$$_FREEMIUM_UPDATE_TRIGGER_ID/g" -e "s/FREEMIUM_UPDATE_LOC/$$_FREEMIUM_UPDATE_TRIGGER_LOCATION/g" -e "s/ENTERPRISE_IDP_ID/$$_ENTERPRISE_IDP_TRIGGER_ID/g" -e "s/ENTERPRISE_IDP_LOC/$$_ENTERPRISE_IDP_TRIGGER_LOCATION/g" script.sh.tpl > script.sh;
+      sh script.sh
+    secretEnv: ["_CLOUD_FUNCTION_URI", "VENDOR_EMAIL_ID","FREEMIUM_TRIGGER_ID", "FREEMIUM_TRIGGER_LOCATION", "ENTERPRISE_TRIGGER_ID", "ENTERPRISE_TRIGGER_LOCATION", "FREEMIUM_DELETE_TRIGGER_LOCATION","ENTERPRISE_DELETE_TRIGGER_LOCATION","FREEMIUM_DELETE_TRIGGER_ID","ENTERPRISE_DELETE_TRIGGER_ID" , "ENTERPRISE_SUB_DOMAIN", "FREEMIUM_SUB_DOMAIN","FREEMIUM_PRJ_ID","HOST_PROJECT_ID","ANTHOS_PRJ_ID","_FREEMIUM_UPDATE_TRIGGER_ID","_FREEMIUM_UPDATE_TRIGGER_LOCATION","_ENTERPRISE_IDP_TRIGGER_ID","_ENTERPRISE_IDP_TRIGGER_LOCATION"]
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    entrypoint: sh
+    args:
+      - '-c'
+      - | 
+        sed  -e "s/PREFIX_NAME/${_PREFIX}/g"    terraform.tfvars.tpl > terraform.tfvars;
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    args:
+      - '-c'
+      - |
+         terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/workload-identity
+    args:
+      - '-c'
+      - |
+        terraform apply -auto-approve
+    id: terraform apply
+    entrypoint: sh
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'metrics-scope-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_VENDOR_EMAIL_ID/versions/latest
+    env: "VENDOR_EMAIL_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_ID/versions/latest
+    env: "FREEMIUM_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_LOCATION/versions/latest
+    env: "FREEMIUM_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_ID/versions/latest
+    env: "ENTERPRISE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_LOCATION/versions/latest
+    env: "ENTERPRISE_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_DELETE_TRIGGER_LOCATION/versions/latest
+    env: "FREEMIUM_DELETE_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_DELETE_TRIGGER_ID/versions/latest
+    env: "FREEMIUM_DELETE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_DELETE_TRIGGER_ID/versions/latest
+    env: "ENTERPRISE_DELETE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_DELETE_TRIGGER_LOCATION/versions/latest
+    env: "ENTERPRISE_DELETE_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_SUB_DOMAIN/versions/latest
+    env: "FREEMIUM_SUB_DOMAIN"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: "ENTERPRISE_SUB_DOMAIN"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_PROJECT_ID/versions/latest
+    env: "FREEMIUM_PRJ_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ANTHOS_PROJECT_ID/versions/latest
+    env: ANTHOS_PRJ_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_HOST_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: "_CLOUD_FUNCTION_URI"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_UPDATE_TRIGGER_ID/versions/latest
+    env: "_FREEMIUM_UPDATE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_UPDATE_TRIGGER_LOCATION/versions/latest
+    env: "_FREEMIUM_UPDATE_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_IDP_TRIGGER_ID/versions/latest
+    env: "_ENTERPRISE_IDP_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_IDP_TRIGGER_LOCATION/versions/latest
+    env: "_ENTERPRISE_IDP_TRIGGER_LOCATION"
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+timeout: 86400s

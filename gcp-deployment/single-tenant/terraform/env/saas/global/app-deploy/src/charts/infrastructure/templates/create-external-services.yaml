@@ -1,0 +1,11 @@
+---
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-mongodb") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-mongodb
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ExternalName
+  externalName: mongodb-headless.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}

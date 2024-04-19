@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aggregation-manager.aggregation-fault-management.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aggregation-manager.labels" . | nindent 4 }}
+    {{- with .Values.afm.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.afm.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.afm.replicas }}
+  selector:
+    matchLabels:
+       {{- include "aggregation-manager.aggregation-fault-management.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.afm.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "aggregation-manager.aggregation-fault-management.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.afm.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.afm.rbac.enabled }}
+      serviceAccountName: {{ .Values.afm.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.afm.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.afm.restartPolicy }}
+      initContainers:
+        - name: check-mongodb-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "aggregation-manager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mongodb service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.afm.clients.mongoDB.uri  | default  ( include "aggregation-manager.mongoDBSrvAddr" .) | quote}}
+        - name: check-nats-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "aggregation-manager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for nats service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.afm.clients.jetstream.uri  | default  ( include "aggregation-manager.jetstreamSrvAddr" .) | quote}}          
+        - name: check-jetstream-stream-aggregation-manager
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "aggregation-manager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "aggregation-manager" ]]; do echo waiting for nats stream aggregation-manager to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.afm.clients.jetstream.uri  | default  ( include "aggregation-manager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.afm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }} 
+        - name: check-jetstream-stream-events
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "aggregation-manager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "EVENTS" ]]; do echo waiting for nats stream EVENTS to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.afm.clients.jetstream.uri  | default  ( include "aggregation-manager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.afm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}                     
+        - name: check-mqtt-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "aggregation-manager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mqtt service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.dcd.clients.mqtt.uri  | default  ( include "aggregation-manager.mqttSrvAddr" .) | quote}}
+      containers:
+        - name: {{ .Values.afm.name }}
+          image: {{ include "aggregation-manager.aggregation-fault-management.image" . | quote }}
+          imagePullPolicy: {{ .Values.afm.image.pullPolicy }}
+          ports:
+            - name: afm-port
+              containerPort: {{ .Values.afm.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.afm.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.afm.name  }}-configmap
+          volumeMounts:
+            {{- with .Values.afm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}          
+            {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}    
+      restartPolicy: {{ .Values.afm.restartPolicy }}
+
+      volumes:
+        - name: {{ .Values.afm.config.volume }}
+          configMap:
+             name: {{ include "aggregation-manager.aggregation-fault-management.configName" . }}
+        {{- with .Values.afm.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+status: {}

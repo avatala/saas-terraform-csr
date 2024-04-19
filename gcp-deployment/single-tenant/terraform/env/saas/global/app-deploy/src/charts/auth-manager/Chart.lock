@@ -1,0 +1,9 @@
+dependencies:
+- name: keycloakx
+  repository: https://codecentric.github.io/helm-charts
+  version: 2.2.1
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 6.7.3
+digest: sha256:fe4738a9c0e27ab1f3eb93ac8d21c6d020ce3c39024c837eb6cac9e0a19d5739
+generated: "2023-07-18T08:29:14.122881165Z"

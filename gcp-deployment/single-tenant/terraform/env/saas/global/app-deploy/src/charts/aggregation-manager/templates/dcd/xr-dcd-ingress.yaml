@@ -1,0 +1,35 @@
+{{- if .Values.dcd.ingress.enabled -}}
+{{- $ := . -}}
+{{- $fullName := include "aggregation-manager.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}.{{ .Values.dcd.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aggregation-manager.labels" . | nindent 4 }}
+  annotations:
+  {{- with .Values.dcd.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- include "aggregation-manager.common-ingress.annotations" $ | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.global.ingress.ingressClassName }}
+  rules:
+    {{- range $host := .Values.global.ingress.hosts }}
+    - host: {{ $host }}
+      http:
+        paths:
+          {{- range $.Values.dcd.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .backend.service.name }}
+                port:
+                  number: 8080
+          {{- end }}
+    {{- end }}
+{{- end }}
+

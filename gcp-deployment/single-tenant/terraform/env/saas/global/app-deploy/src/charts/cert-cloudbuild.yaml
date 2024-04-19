@@ -1,0 +1,76 @@
+substitutions:
+  _BASE_DOMAIN: enterprise.xr.inp.infinera.com
+  _IPM_DOMAIN: ipm-${_TENANT_ID}.${_BASE_DOMAIN}
+  _PLGD_DOMAIN: plgd-${_TENANT_ID}.${_BASE_DOMAIN}
+  _OTEL_DOMAIN: xrmetrics-${_TENANT_ID}.${_BASE_DOMAIN}
+  _INFL_DOMAIN: xrinflux-${_TENANT_ID}.${_BASE_DOMAIN}
+  _ING_NAME: nginx
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-ENTERPRISE_PROJECT_ID/versions/latest
+    env: _ENTERPRISE_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_NAME/versions/latest
+    env: _CUSTOMER_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/HELM_REPO_NAME/versions/latest
+    env: _HELM_REPO_NAME
+  - versionName: projects/$PROJECT_NUMBER/secrets/HELM_REPO_ATKN/versions/latest
+    env: _HELM_REPO_ATKN
+
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  dir: gcp-deployment/single-tenant/terraform/env/saas/global/app-deploy/src/charts
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    set -e
+    git fetch > /dev/null 2>&1
+    git checkout -b ${_CUSTOMER_NAME}
+    service_account=$(gcloud container clusters describe ${_CUSTOMER_NAME}-saas-tenant-cluster-us-ct1-01 --project=$$_ENTERPRISE_PROJECT_ID --region $${_CUSTOMER_REGION} --format='value(nodeConfig.serviceAccount)')
+    sed -e "s/TENANT_NAME/${_TENANT_ID}/g" -e "s/BASE_DOMAIN/${_BASE_DOMAIN}/g" -e "s/ING_NAME/${_TENANT_ID}/g" -e "s/IPM_DOMAIN/${_IPM_DOMAIN}/g" -e "s/PLGD_DOMAIN/${_PLGD_DOMAIN}/g" -e "s/OTEL_DOMAIN/${_OTEL_DOMAIN}/g" -e "s/INFL_DOMAIN/${_INFL_DOMAIN}/g" -e "s/GCAS_PROJECT/$$_ENTERPRISE_PROJECT_ID/g" -e "s/GCAS_LOCATION/$${_CUSTOMER_REGION}/g" -e "s/CUSTOMER_NAME/$${_CUSTOMER_NAME}/g" ipm.yaml.tpl > ipm.yaml
+    sed -e "s/REGION/$${_CUSTOMER_REGION}/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/SERVICE_ACCOUNT/$service_account/g" -e "s/PROJECT/$$_ENTERPRISE_PROJECT_ID/g" -e "s/HELM_REPO_NAME/$$_HELM_REPO_NAME/g" -e "s/HELM_REPO_ATKN/$$_HELM_REPO_ATKN/g" cert-manger-deploy.sh.tpl > cert-manager-deploy.sh
+    sed -e "s/REGION/$${_CUSTOMER_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+    sh script.sh
+    rm -rf script.sh
+  env:
+    - 'CLOUDSDK_COMPUTE_REGION=$${_CUSTOMER_REGION}'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=${_CUSTOMER_NAME}-saas-tenant-cluster-us-ct1-01'
+  secretEnv: ['_ENTERPRISE_PROJECT_ID', '_CLOUD_FUNCTION_URI', '_CUSTOMER_NAME', '_CUSTOMER_REGION', '_HELM_REPO_NAME', '_HELM_REPO_ATKN']
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  dir: gcp-deployment/single-tenant/terraform/env/saas/global/app-deploy/src/charts
+  entrypoint: 'bash'
+  args: 
+  - '-c'
+  - |
+    set -e
+    chmod +x cert-manager-deploy.sh
+    gcloud container clusters get-credentials ${_CUSTOMER_NAME}-saas-tenant-cluster-us-ct1-01 --region $${_CUSTOMER_REGION} --project=$$_ENTERPRISE_PROJECT_ID
+    ./cert-manager-deploy.sh
+
+  env:
+    - 'CLOUDSDK_COMPUTE_REGION=$${_CUSTOMER_REGION}'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=${_CUSTOMER_NAME}-saas-tenant-cluster-us-ct1-01'
+  secretEnv: ['_ENTERPRISE_PROJECT_ID', '_CUSTOMER_REGION']
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args: 
+      - '-c'
+      - |
+        gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-helm-app-deploy-saas-trigger --branch=${_BRANCH_NAME} --region $$_CUSTOMER_REGION
+  id: 'trigger next build'
+  secretEnv: ['_CUSTOMER_REGION', '_CUSTOMER_NAME']
+
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY
+  workerPool:
+    'projects/${_PREFIX}-anthos-hub/locations/${_PRE_REQ_REGION}/workerPools/${_PREFIX}-private-worker-pool'
+timeout: 86400s

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "DomainManager.event-gateway.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+    {{- with .Values.eg.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.eg.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.eg.replicas }}
+  selector:
+    matchLabels:
+       {{- include "DomainManager.event-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.eg.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "DomainManager.event-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.eg.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.eg.rbac.enabled }}
+      serviceAccountName: {{ .Values.eg.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.eg.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.eg.restartPolicy }}
+
+      initContainers:
+        - name: check-mongodb-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mongodb service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.eg.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBSrvAddr" .) | quote}}
+        - name: check-nats-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for nats service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.eg.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}          
+        - name: check-jetstream-stream-cm
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "DomainManager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "^CM\\n" ]]; do echo waiting for nats stream CM to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.eg.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.eg.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}    
+      containers:
+        - name: {{ .Values.eg.name }}
+          image: {{ include "DomainManager.event-gateway.image" . | quote }}
+          imagePullPolicy: {{ .Values.eg.image.pullPolicy }}
+          ports:
+            - name: eg-port
+              containerPort: {{ .Values.eg.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.eg.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.eg.name  }}-configmap
+          volumeMounts:
+            {{- with .Values.eg.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}  
+            {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }} 
+      restartPolicy: {{ .Values.eg.restartPolicy }}
+
+      volumes:
+        - name: {{ .Values.eg.config.volume }}
+          configMap:
+             name: {{ include "DomainManager.event-gateway.configName" . }}
+        {{- with .Values.eg.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+status: {}
+

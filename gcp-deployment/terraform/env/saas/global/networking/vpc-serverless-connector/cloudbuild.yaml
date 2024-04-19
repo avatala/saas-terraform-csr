@@ -1,0 +1,106 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    entrypoint: sh
+    args:
+    - '-c'
+    - | 
+      sed -e "s/REGION_NAME/${_REGION}/g"  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g"  -e "s/PREFIX_NAME/${_PREFIX}/g"   terraform.tfvars.tpl > terraform.tfvars;
+      sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/networking/vpc-serverless-connector
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        if (gcloud artifacts repositories describe saas-cloud-function --location=${_REGION} --project=${_PREFIX}-admin-host); then
+          echo "Artifact Registry repository exists or not required"
+        else
+          if [ "${_KMS_KEY_PATH}" = "null" ]; then
+            gcloud artifacts repositories create saas-cloud-function --location=${_REGION} --repository-format=docker --project=${_PREFIX}-admin-host
+          else
+            gcloud artifacts repositories create saas-cloud-function --location=${_REGION} --repository-format=docker --kms-key=${_KMS_KEY_PATH} --project=${_PREFIX}-admin-host
+          fi
+        fi
+    id: 'artifact registry creation'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        if [ "${_KMS_KEY_PATH}" = "null" ]; then
+          gcloud alpha builds triggers run cloud-function-${_PREFIX}-trigger --branch=${_BRANCH_NAME}
+        else
+          gcloud beta functions deploy master-${_PREFIX}-cloud-function --region=${_REGION} --gen2 --runtime=nodejs18 --entry-point=performAction --source=gs://${_PREFIX}-cloud-function-us-ct1-storage/function-source.zip --kms-key=${_KMS_KEY_PATH} --docker-repository=projects/${_PREFIX}-admin-host/locations/${_REGION}/repositories/saas-cloud-function --min-instances=1 --max-instances=10 --memory=512Mi --timeout=540s --cpu=1 --ingress-settings=internal-and-gclb --trigger-http --service-account=${_PREFIX}-cloudrun-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com --no-allow-unauthenticated --set-env-vars=PROJECT_ID=${_PREFIX}-admin-host,ADMIN_PORTAL_DOMAIN=admin-saas.${_PREFIX}.${_ADMIN_DOMAIN} --project=${_PREFIX}-admin-host
+          sleep 10
+          gcloud functions add-iam-policy-binding master-${_PREFIX}-cloud-function --region=${_REGION} --member=allAuthenticatedUsers --role=roles/cloudfunctions.invoker --project=${_PREFIX}-admin-host
+          gcloud beta functions deploy email-verification-${_PREFIX}-cloud-function --region=${_REGION} --gen2 --runtime=nodejs18 --entry-point=performTrigger --source=gs://${_PREFIX}-cloud-function-us-ct1-storage/function-source.zip --kms-key=${_KMS_KEY_PATH} --docker-repository=projects/${_PREFIX}-admin-host/locations/${_REGION}/repositories/saas-cloud-function --min-instances=1 --max-instances=10 --memory=512Mi --timeout=540s --cpu=1 --ingress-settings=internal-and-gclb --trigger-http --service-account=${_PREFIX}-cloudrun-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com --allow-unauthenticated --set-env-vars=PROJECT_ID=${_PREFIX}-admin-host,ADMIN_PORTAL_DOMAIN=admin-saas.${_PREFIX}.${_ADMIN_DOMAIN},CLOUD_BUILD_PROJECT_ID=${PROJECT_ID},FREEMIUM_CLOUD_BUILD_TRIGGER_ID=$$FREEMIUM_TRIGGER_ID,FREEMIUM_CLOUD_BUILD_PROJECT_LOCATION=$$FREEMIUM_TRIGGER_LOCATION,FREEMIUM_CLOUD_BUILD_REPO_NAME=${_CSR_APP_REPO_NAME},FREEMIUM_CLOUD_BUILD_BRANCH_NAME=${_TERRAFORM_CODE_BRANCH_NAME},ENTERPRISE_CLOUD_BUILD_TRIGGER_ID=$$ENTERPRISE_TRIGGER_ID,ENTERPRISE_CLOUD_BUILD_PROJECT_LOCATION=$$ENTERPRISE_TRIGGER_LOCATION,ENTERPRISE_CLOUD_BUILD_REPO_NAME=${_CSR_TERRAFORM_REPO_NAME},ENTERPRISE_CLOUD_BUILD_BRANCH_NAME=${_TERRAFORM_CODE_BRANCH_NAME} --project=${_PREFIX}-admin-host
+          sleep 10
+          gcloud functions add-iam-policy-binding email-verification-${_PREFIX}-cloud-function --region=${_REGION} --member=allUsers --role=roles/cloudfunctions.invoker --project=${_PREFIX}-admin-host
+          gcloud run services add-iam-policy-binding email-verification-${_PREFIX}-cloud-function --region=${_REGION} --member=allUsers --role=roles/run.invoker --project=${_PREFIX}-admin-host
+          gcloud alpha builds triggers run cloud-armor-${_PREFIX}-trigger --branch=${_BRANCH_NAME}
+        fi
+    id: 'trigger next build'
+    secretEnv: ["FREEMIUM_TRIGGER_LOCATION","ENTERPRISE_TRIGGER_ID","ENTERPRISE_TRIGGER_LOCATION","FREEMIUM_TRIGGER_ID"]
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_ID/versions/latest
+    env: "FREEMIUM_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_TRIGGER_LOCATION/versions/latest
+    env: "FREEMIUM_TRIGGER_LOCATION"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_ID/versions/latest
+    env: "ENTERPRISE_TRIGGER_ID"
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_TRIGGER_LOCATION/versions/latest
+    env: "ENTERPRISE_TRIGGER_LOCATION"
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY 
+timeout: 86400s

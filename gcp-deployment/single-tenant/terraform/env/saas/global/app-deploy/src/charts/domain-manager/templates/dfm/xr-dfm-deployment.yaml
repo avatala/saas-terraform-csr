@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "DomainManager.domain-fault-management.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+    {{- with .Values.dfm.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.dfm.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.dfm.replicas }}
+  selector:
+    matchLabels:
+       {{- include "DomainManager.domain-fault-management.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.dfm.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "DomainManager.domain-fault-management.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.dfm.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.dfm.rbac.enabled }}
+      serviceAccountName: {{ .Values.dfm.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.dfm.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.dfm.restartPolicy }}
+
+      initContainers:
+        - name: check-mongodb-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mongodb service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.dfm.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBSrvAddr" .) | quote}}
+        - name: check-nats-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for nats service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.dfm.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}          
+        - name: check-jetstream-stream-cm
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "DomainManager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "^CM\\n" ]]; do echo waiting for nats stream CM to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.dfm.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.dfm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}   
+        - name: check-jetstream-stream-aggregation-manager
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "DomainManager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "aggregation-manager" ]]; do echo waiting for nats stream aggregation-manager to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.dfm.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.dfm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}   
+      containers:
+        - name: {{ .Values.dfm.name }}
+          image: {{ include "DomainManager.domain-fault-management.image" . | quote }}
+          imagePullPolicy: {{ .Values.dfm.image.pullPolicy }}
+          ports:
+            - name: dfm-port
+              containerPort: {{ .Values.dfm.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.dfm.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.dfm.name  }}-configmap
+          volumeMounts:
+            {{- with .Values.dfm.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}  
+            {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}    
+      restartPolicy: {{ .Values.dfm.restartPolicy }}
+
+      volumes:
+        - name: {{ .Values.dfm.config.volume }}
+          configMap:
+             name: {{ include "DomainManager.domain-fault-management.configName" . }}
+        {{- with .Values.dfm.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+status: {}

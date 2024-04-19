@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.swm.name  }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+
+  HTTP_PORT: {{ printf " " }}{{- include  "DomainManager.software-manager.port" . | quote}}
+  EXECUTOR_QUEUE_SIZE:  {{ printf " " }}{{ .Values.swm.config.ExecutorQueueSize | quote }}
+  JS_MAX_ACK_PENDING: {{ printf " " }}{{ .Values.swm.config.JsMacAckPending | quote }}
+  JS_ACK_WAIT: {{ printf " " }}{{ .Values.swm.config.jsAckWait | quote }}
+  LOG_LEVEL: {{ printf " " }}{{ .Values.swm.config.logLevel | quote }}
+  ISSUER_URL: {{ printf " " }}{{- include  "DomainManager.keycloakAddr" . | quote}}
+  INTROSPECT_TOKEN_CHECK: {{ printf " " }}{{ .Values.global.config.verifyToken | quote }}
+
+  {{- if .Values.swm.config.timeout }}
+  TIME_OUT_FOR_REGULAR_UPGRADE_RESPONSE: {{ printf " " }}{{ .Values.swm.config.timeout.regularUpgradeResponse | quote }}
+  TIME_OUT_FOR_SOFTWARE_DOWNLOAD:  {{ printf " " }}{{ .Values.swm.config.timeout.softwareDownload | quote }}
+  TIME_OUT_FOR_SOFTWARE_EXECUTE: {{ printf " " }}{{ .Values.swm.config.timeout.softwareExecute | quote }}
+  TIME_OUT_FOR_UPGRADE_WORKFLOW: {{ printf " " }}{{ .Values.swm.config.timeout.upgradeWorkflow | quote }}
+  TIME_OUT_FOR_REGULAR_DB_UPDATE: {{ printf " " }}{{ .Values.swm.config.timeout.regularDbUpdate | quote }}
+  WAIT_TIME_FOR_NE_RESPONSE: {{ printf " " }}{{ .Values.swm.config.timeout.neResponseWaitTime | quote }}
+  DEFAULT_REVERT_TIMEOUT: {{ printf " " }}{{ .Values.swm.config.timeout.revertTimeout | quote }}
+  {{- end }}
+  #Temporal
+  temporal_namespace: {{ printf " " }}{{ .Values.swm.clients.temporal.namespace | quote }}
+  TEMPORAL_ADDR: {{ printf " " }}{{  .Values.swm.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+  TEMPORAL_TLS_ENABLED: "true"
+  TEMPORAL_TLS_CA: {{  .Values.swm.clients.temporal.tls.caPool  |  quote }}
+  TEMPORAL_TLS_KEY: {{  .Values.swm.clients.temporal.tls.keyFile  |  quote }}
+  TEMPORAL_TLS_CERT:  {{  .Values.swm.clients.temporal.tls.certFile  |  quote }} 
+  RETRY_POLICY_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.swm.clients.temporal.retry.executionTimeout | quote }}
+  RETRY_POLICY_MAXIMUM_ATTEMPS: {{ printf " " }}{{ .Values.swm.clients.temporal.retry.maximumAttemps | quote }}
+  RETRY_POLICY_MAXIMUM_INTERVAL: {{ printf " " }}{{ .Values.swm.clients.temporal.retry.maximumInterval | quote }}
+  WORKFLOW_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.swm.clients.temporal.workflow.executionTimeout | quote }}
+  CHILD_WORKFLOW_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.swm.clients.temporal.child.executionTimeout | quote }}
+  START_TO_CLOSE_TIMEOUT: {{ printf " " }}{{ .Values.swm.clients.temporal.activity.startToCloseTimeout | quote }}
+  LOCAL_START_TO_CLOSE_TIMEOUT: {{ printf " " }}{{ .Values.swm.clients.temporal.local.startToCloseTimeout | quote }}
+  temporal_namespace: {{ printf " " }}{{ .Values.swm.clients.temporal.namespace | quote }}
+  MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE: {{ .Values.swm.config.maxConcurrentUpgrades | default 20 | quote }}
+  MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE: {{ .Values.swm.config.maxConcurrentUpgrades | default 20 | quote }}
+  MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE: {{ .Values.swm.config.maxConcurrentUpgrades | default 20 | quote }}
+
+
+
+  #Jetstream
+  NATS_JETSTREAM:  {{ printf " " }}{{  .Values.swm.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamAddr" .) | quote}}
+  JETSTREAM_TLS_ENABLED: "true"
+  JETSTREAM_TLS_CA: {{  .Values.swm.clients.jetstream.tls.caPool  |  quote }}
+  JETSTREAM_TLS_KEY: {{  .Values.swm.clients.jetstream.tls.keyFile  |  quote }}
+  JETSTREAM_TLS_CERT:  {{  .Values.swm.clients.jetstream.tls.certFile  |  quote }}
+  
+  #MongoDB
+  MONGO_DB_ADDR:  {{ printf " " }}{{  .Values.swm.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBAddr" .) | quote}}
+  MONGO_TLS_ENABLED: "true"
+  MONGO_TLS_CA: {{  .Values.swm.clients.mongoDB.tls.caPool  |  quote }}
+  MONGO_TLS_KEY: {{  .Values.swm.clients.mongoDB.tls.keyFile  |  quote }}
+  MONGO_TLS_CERT:  {{  .Values.swm.clients.mongoDB.tls.certFile  |  quote }}
+
+  #Open Telemetry
+  {{- if .Values.global.clients.openTelemetry.uri }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.uri | quote }}
+  OPEN_TELEMETRY_TLS_ENABLED: "true"
+  OPEN_TELEMETRY_TLS_CA: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.caPool | quote }}
+  OPEN_TELEMETRY_TLS_CERT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.certFile | quote }}
+  OPEN_TELEMETRY_TLS_KEY: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.keyFile | quote }}
+  {{- end }}

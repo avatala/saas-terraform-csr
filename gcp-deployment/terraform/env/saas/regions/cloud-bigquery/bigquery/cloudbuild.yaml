@@ -1,0 +1,71 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    entrypoint: sh
+    args:
+        - '-c'
+        - | 
+          sed -e "s|KMS_KEY|${_KMS_KEY_PATH}|g" -e "s/REGION_NAME/${_REGION}/g" -e "s/ZONE_NAME/${_ZONE}/g" -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/LOGS_BUCKET_NAME/${_LOGS_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  -e "s/CODE_REPOSITORY_NAME/${_REPO_NAME}/g" -e "s/TEMP_SEED_PROJECT_ID/${_TEMP_SEED_PROJECT_ID}/g" -e "s/REPO_BRANCH_NAME/${_BRANCH_NAME}/g"  terraform.tfvars.tpl > terraform.tfvars;
+          sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    args:
+        - '-c'
+        - |
+          terraform init
+    id: terraform init
+    entrypoint: sh
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    args:
+        - '-c'
+        - |
+          terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    args:
+        - '-c'
+        - |
+          terraform validate
+    id: terraform validate
+    entrypoint: sh
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    args:
+        - '-c'
+        - |
+          terraform plan
+    id: terraform plan
+    entrypoint: sh
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/bigquery
+    args:
+        - '-c'
+        - |
+          terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'gke-cluster-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s

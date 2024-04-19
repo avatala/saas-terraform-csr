@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-data-cfg
+  labels:
+    {{- include "emulators.labels" . | nindent 4 }}  
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-5"     
+data:
+{{- range $path, $content := .Files.Glob "data/**" }}
+  {{- $key := trimPrefix "data/" $path | replace "/" "_" }}
+  {{ $key }}: |-
+{{ (toString $content) | indent 4 }}
+{{- end }}
+---
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: {{ .Release.Name }}-debug-keys
+# data:
+#   deviceKeys: {{ include "emulators.getDeviceKeys" . | quote }}
+# ---
+{{- $rootCtx := . -}}
+
+{{- $deviceKeys := include "emulators.getDeviceKeys" . | trim | splitList "\n" -}}
+{{- range $deviceKey := $deviceKeys }}
+{{- if $deviceKey }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $deviceKey | replace "_" "-" | lower }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $deviceKey | replace "_" "-" | lower }}
+  template:
+    metadata:
+      labels:
+        app: {{ $deviceKey | replace "_" "-" | lower }}
+    spec:
+      {{- if $rootCtx.Values.global.infnRegistry }}
+      imagePullSecrets:
+      - name: infn-registry
+      {{- end }}
+      containers:
+      - name: {{ $deviceKey | replace "_" "-" | lower }}
+        {{- if hasPrefix "xr_" $deviceKey }}
+        image: "{{ $rootCtx.Values.global.infnRegistry.url }}/{{ $rootCtx.Values.global.image.xr }}"
+        {{- else if hasPrefix "ndu_" $deviceKey }}
+        image: "{{ $rootCtx.Values.global.infnRegistry.url }}/{{ $rootCtx.Values.global.image.ndu }}"
+        {{- end }}
+        imagePullPolicy: {{ $rootCtx.Values.global.image.pullPolicy }}      
+        env:
+        - name: START_GMCU
+          value: "true"
+        - name: USE_DPS
+          value: "true"
+        - name: DPS_ENDPOINT
+          value: "{{ $rootCtx.Values.plgd.DPS_ENDPOINT }}"
+        - name: DPS_SKIPCAVERIFICATION
+          value: "true"
+        - name: DPS_CERT_DIR
+          value: "/certs"
+        command: ["/bin/sh", "-c"]
+        args:
+          - >
+            /etc/init.d/docker-start &&
+            sleep infinity           
+        volumeMounts:
+        - name: certs
+          mountPath: /certs
+        - name: inv
+          mountPath: /inv
+      volumes:
+      - name: certs
+        configMap:
+          name: "{{ $rootCtx.Release.Name }}-data-cfg"
+          items:
+          - key: {{ $deviceKey }}_certs_mfgcrt.pem
+            path: mfgcrt.pem
+          - key: {{ $deviceKey }}_certs_mfgkey.pem
+            path: mfgkey.pem
+      - name: inv
+        configMap:
+          name: "{{ $rootCtx.Release.Name }}-data-cfg"
+          items:
+          - key: {{ $deviceKey }}_inv_initialize.cfg
+            path: initialize.cfg
+          - key: {{ $deviceKey }}_inv_startup.cfg
+            path: startup.cfg
+{{- end }}
+{{- end }}

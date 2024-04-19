@@ -1,0 +1,10 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: module-report
+  labels:
+    grafana_dashboard: "1"
+data:
+  module_report.json: |-
+    {{- $.Files.Get "dashboards/module_report.json"  | nindent 4 -}}

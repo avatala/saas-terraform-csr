@@ -1,0 +1,128 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    secretEnv: ['HOST_PROJECT_ID']
+    entrypoint: /bin/sh
+    args:
+      - '-c'
+      - |
+        sed -e "s/HOST_PROJECT/$$HOST_PROJECT_ID/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s|NOTIFICATION_CHANNEL_ID|$(gcloud beta monitoring channels list --filter='type="email" AND labels.email_address="${_VENDOR_EMAIL_ID}"' --project=$$HOST_PROJECT_ID | grep name: | sed -e 's/name: //')|g" terraform.tfvars.tpl > terraform.tfvars;
+        sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf;
+
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        if (gcloud artifacts repositories describe saas-cloud-function --location=${_REGION} --project=${_PREFIX}-admin-host); then
+          echo "Artifact Registry repository exists or not required"
+        else
+          if [ "${_KMS_KEY_PATH}" = "null" ]; then
+            gcloud artifacts repositories create saas-cloud-function --location=${_REGION} --repository-format=docker --project=${_PREFIX}-admin-host
+          else
+            gcloud artifacts repositories create saas-cloud-function --location=${_REGION} --repository-format=docker --kms-key=${_KMS_KEY_PATH} --project=${_PREFIX}-admin-host
+          fi
+        fi
+    id: 'artifact registry creation'
+  - name: 'gcr.io/cloud-builders/gcloud'
+    dir: gcp-deployment/terraform/env/saas/global/alerting/alert-policy
+    entrypoint: 'bash'
+    args: 
+      - '-c'
+      - |
+        if [ "${_LB_TYPE}" = "http" ]; then
+          if [ "${_KMS_KEY_PATH}" = "null" ]; then
+            gcloud alpha builds triggers run cloud-function-before-signin-${_PREFIX}-trigger --branch=${_BRANCH_NAME}
+          else
+            gcloud functions deploy ${_PREFIX}-before-signin --region=${_REGION} --runtime=nodejs18 --entry-point=beforeSignIn --source=../../../regions/cloud-function-before-signin/script --kms-key=${_KMS_KEY_PATH} --docker-repository=projects/${_PREFIX}-admin-host/locations/${_REGION}/repositories/saas-cloud-function --min-instances=0 --clear-max-instances --memory=128Mi --timeout=60s --ingress-settings=internal-only --trigger-http --service-account=${_PREFIX}-cloudrun-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com --vpc-connector=projects/${_PREFIX}-admin-host/locations/${_REGION}/connectors/${_PREFIX}-vpc-connect --egress-settings=all --update-labels=owner=saas --set-env-vars=PROJECT_ID=${_PREFIX}-admin-host --security-level=secure-optional --project=${_PREFIX}-admin-host
+            sleep 10
+            gcloud functions add-iam-policy-binding ${_PREFIX}-before-signin --region=${_REGION} --member=allUsers --role=roles/cloudfunctions.invoker --project=${_PREFIX}-admin-host
+          fi
+        fi
+    id: 'trigger next build'
+
+  - name: gcr.io/cloud-builders/gcloud
+    args:
+      - '-c'
+      - |-
+        if [ "${_APIGEE}" == "true" ];then
+          gcloud alpha builds triggers run apigee-${_PREFIX}-trigger --branch=${_BRANCH_NAME}     
+        fi
+    id: 'trigger apigee build'
+    entrypoint: 'bash'
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: Removing Owner Permission
+    entrypoint: sh
+    args:
+    - '-c'
+    - |-
+      project_id=$(gcloud info --format='value(config.project)')
+      export project_id
+      for id in $$HOST_PROJECT_ID  $$_FREEMIUM_PROJECT_ID $$ANTHOS_PRJ_ID
+      do
+      gcloud projects remove-iam-policy-binding $id --member="serviceAccount:saas-cloudbuild-sa@$project_id.iam.gserviceaccount.com" --role='roles/owner' >/dev/null
+      done
+      gcloud projects remove-iam-policy-binding $$HOST_PROJECT_ID --member="user:$$VENDOR_EMAIL_ID" --role='roles/editor' >/dev/null
+    secretEnv: ['_FREEMIUM_PROJECT_ID', 'HOST_PROJECT_ID', 'ANTHOS_PRJ_ID','VENDOR_EMAIL_ID']
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY 
+timeout: 86400s     
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_PROJECT_ID/versions/latest
+    env: _FREEMIUM_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PROJECT_ID/versions/latest
+    env: HOST_PROJECT_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ANTHOS_PROJECT_ID/versions/latest
+    env: ANTHOS_PRJ_ID
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_VENDOR_EMAIL_ID/versions/latest
+    env: "VENDOR_EMAIL_ID"

@@ -1,0 +1,214 @@
+global:
+  infnRegistry:
+    url: ghcr.io/infinera
+    username: <USERNAME>
+    password: <ACCESS_TOKEN>
+  postgres:
+    postgres_password: aW5maW5lcmEx
+    password: ZGJwYXNzd29yZA==
+    replication_password: ZGJwYXNzd29yZA==     
+  keycloak:
+    hosts:
+      - ipm.localhost
+      - plgd.localhost
+keycloakx:
+  keycloak:
+    hostname: ipm.localhost
+  image:
+    tag: "21.1"
+  imagePullSecrets:
+    - name: "infn-registry"
+  command:
+    - "/opt/keycloak/bin/kc.sh"
+    - "--verbose"
+    - "start"
+    - "--auto-build"
+    - "--import-realm"
+    - "--http-enabled=true"
+    - "--http-port=8080"
+    - "--hostname-strict=false"
+    - "--spi-events-listener-jboss-logging-success-level=info"
+    - "--spi-events-listener-jboss-logging-error-level=warn"
+  extraVolumes: |
+    - name: realm-prod-secret
+      secret:
+        secretName: realm-prod-secret
+    - name: sql-tls
+      secret:
+        secretName: sql-client-tls
+    - name: theme
+      emptyDir: {}
+  extraVolumeMounts: |
+    - name: realm-prod-secret
+      mountPath: "/opt/keycloak/data/import/xr-cm.json"
+      readOnly: true
+      subPathExpr: "xr-cm.json"
+    - name: sql-tls
+      mountPath: /certs/sql
+      readOnly: true
+    - name: theme
+      mountPath: /opt/keycloak/themes/i-material
+  extraInitContainers: |
+    - name: theme-provider
+      image: {{ .Values.global.infnRegistry.url }}/ipm/keycloak-extras:v3.0.0
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+      args:
+        - -c
+        - |
+          echo "Copying theme..."
+          cp -R /extras/themes/i-material/* /opt/keycloak/themes/i-material
+      volumeMounts:
+        - name: theme
+          mountPath: /opt/keycloak/themes/i-material
+  extraEnv: |
+    - name: KEYCLOAK_ADMIN
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "keycloak.fullname" . }}-admin-creds
+          key: user
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "keycloak.fullname" . }}-admin-creds
+          key: password
+    # - name: KC_HOSTNAME
+    #   value: {{ .Values.keycloak.hostname }}
+    - name: JDBC_PARAMS
+      value: "sslmode=require"
+    - name: KC_DB_URL
+      value: "jdbc:postgresql://inf-postgresql:5432/keycloak?ssl=true&sslmode=require&sslcert=/certs/sql/tls.crt&sslkey=/certs/sql/key.der&sslrootcert=/certs/sql/ca.crt"
+    - name: JAVA_OPTS_APPEND
+      value: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=50.0
+        -Djava.awt.headless=true
+        -Djgroups.dns.query={{ include "keycloak.fullname" . }}-headless
+    - name: KC_HOSTNAME_STRICT_HTTPS
+      value: "false"        
+    - name: KEYCLOAK_FRONTEND_URL
+      value: "https://{{ index .Values.global.keycloak.hosts 0 }}/"
+    - name: KEYCLOAK_ADMIN_URL
+      value: "https://{{ index .Values.global.keycloak.hosts 0 }}/"
+    - name: KC_HOSTNAME_URL
+      value: "https://{{ index .Values.global.keycloak.hosts 0 }}/"         
+  http:
+    relativePath: "/"
+  dbchecker:
+    enabled: true
+    image:
+      # Docker image used to check Database readiness at startup
+      repository: busybox
+      # Image tag for the dbchecker image
+      tag: 1.35
+  ingress:
+    #fileName: keycloakx-ingress.yaml
+    # If `true`, an Ingress is created
+    enabled: true
+    # The name of the Ingress Class associated with this ingress
+    # The Service port targeted by the Ingress
+    ingressClassName: nginx
+    servicePort: http
+    # Ingress annotations
+    annotations:
+      ## Resolve HTTP 502 error using ingress-nginx:
+      ## See https://www.ibm.com/support/pages/502-error-ingress-keycloak-response
+      # nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      nginx.org/websocket-services: "keycloak"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+
+    # Additional Ingress labels
+    labels: { }
+    # List of rules for the Ingress
+    rules:    
+      - host: ipm.localhost
+        paths:
+          - path: '/admin'
+            pathType: Prefix
+          - path: '/realms'
+            pathType: Prefix
+          - path: '/resources'
+            pathType: Prefix
+          - path: '/js'
+            pathType: Prefix
+    # TLS configuration
+    tls: [ ]
+
+    # ingress for console only (/admin)
+    console:
+      # If `true`, an Ingress is created for console path only
+      enabled: true
+      # The name of Ingress Class associated with the console ingress only
+      # Ingress annotations for console ingress only
+      # Useful to set nginx.ingress.kubernetes.io/whitelist-source-range particularly
+      ingressClassName: nginx
+      annotations:
+        nginx.org/websocket-services: "keycloak"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+        nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      rules:
+        - host: ipm.localhost
+          paths:
+            - path: '/admin'
+              pathType: Prefix
+      # Console TLS configuration
+      tls: [ ]
+
+  database:
+    vendor: postgres
+    hostname: inf-postgresql
+    port: 5432
+    existingSecret: ipm-postgresql-secret
+    existingSecretKey: password
+    username: dbusername
+    database: keycloak
+
+  secrets:
+    admin-creds:
+      annotations:
+        my-test-annotation: Test secret for {{ include "keycloak.fullname" . }}
+      stringData:
+        user: admin
+        password: secret
+
+oauth2-proxy:
+  extraArgs:
+    provider: oidc
+    provider-display-name: Login to XR-IPM
+    client-id: xr-web-client
+    client-secret: xr-web-client
+    redirect-url: "http://keycloak-keycloakx-http/oauth2/callback"
+    oidc-issuer-url: "http://keycloak-keycloakx-http/realms/xr-cm"
+    insecure-oidc-skip-issuer-verification: true
+    cookie-secret: "VStNNnNZQVlrK0g3ZVlHM2dvWldyaWg2QW9RYTFyaWg="
+    insecure-oidc-allow-unverified-email: true
+    email-domain: "*"
+    cookie-secure: true
+    ssl-insecure-skip-verify: true
+    skip-jwt-bearer-tokens: true
+    ssl-upstream-insecure-skip-verify: true
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: oauth2-proxy
+          topologyKey: "kubernetes.io/hostname"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 100Mi
+    requests:
+      cpu: 100m
+      memory: 25Mi
+  ingress:
+    enabled: false
+    path: /oauth2
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+      nginx.ingress.kubernetes.io/enable-cors: "true"

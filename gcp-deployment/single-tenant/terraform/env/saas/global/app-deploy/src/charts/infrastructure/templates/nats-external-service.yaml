@@ -1,0 +1,16 @@
+{{- if .Values.nodePortEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: inf-nats-external
+spec:
+  type: NodePort
+  ports:
+  - port: 4222
+    targetPort: 4222
+    nodePort: 31222
+    protocol: TCP 
+  selector:
+    app.kubernetes.io/instance: inf
+    app.kubernetes.io/name: nats
+{{- end }}

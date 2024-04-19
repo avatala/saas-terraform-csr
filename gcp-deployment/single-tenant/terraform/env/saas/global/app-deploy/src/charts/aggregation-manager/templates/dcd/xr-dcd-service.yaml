@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aggregation-manager.device-configuration-distributor.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "aggregation-manager.labels" . | nindent 4 }}
+      {{- with .Values.dcd.service.labels }}
+      {{- . | toYaml | nindent 4 }}
+      {{- end }}
+spec:
+  type: {{ .Values.dcd.service.type | default "ClusterIP" }}
+  ports:
+  - name: dcd-port
+    port: {{ .Values.dcd.port | default "8080" }}
+    targetPort: dcd-port
+  selector:
+   {{- include "aggregation-manager.device-configuration-distributor.selectorLabels" . | nindent 4 }}

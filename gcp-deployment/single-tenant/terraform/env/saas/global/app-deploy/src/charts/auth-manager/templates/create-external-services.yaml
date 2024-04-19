@@ -1,0 +1,11 @@
+{{- if not (lookup "v1" "Service" .Release.Namespace  "inf-postgresql") }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: inf-postgresql
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ExternalName
+  externalName: inf-postgresql.{{ .Values.namespace_inf }}.svc.cluster.local
+{{- end }}
+

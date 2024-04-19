@@ -1,0 +1,12 @@
+dependencies:
+- name: collector
+  repository: oci://ghcr.io/infinera/gcp-ipm-charts
+  version: 0.14.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 6.59.4
+- name: xripm-int
+  repository: oci://ghcr.io/infinera/gcp-ipm-charts
+  version: 0.14.1
+digest: sha256:1fadd80cbf06b9fee15d9f698f4658d2cf52527466a6f8b9949780b9ad88f432
+generated: "2023-11-29T14:35:15.925601254-08:00"

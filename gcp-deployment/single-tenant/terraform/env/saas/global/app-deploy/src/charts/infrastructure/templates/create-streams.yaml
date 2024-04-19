@@ -1,0 +1,50 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-create-streams
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+  labels:
+    app: nats-stream
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: create-streams
+          image: synadia/nats-server:nightly
+          command:
+            - sh
+            - -c
+            - |
+              # wait until NATS is ready
+              export NATS_URL="{{ .Release.Name }}-nats.{{ .Release.Namespace}}.svc.cluster.local:4222"
+              printf "Waiting for NATS to be ready"
+              until nc -z ${NATS_URL}; do
+                echo "."
+                sleep 1
+              done;
+
+              # Save NATS context
+              nats context save --server=${NATS_URL} \
+                --tlsca=/certs/ca.crt --tlscert=/certs/tls.crt \
+                --tlskey=/certs/tls.key \
+                --select ipm-nats
+
+              # Create NATS streams
+              nats stream add CM --subjects="cm.event.>","cm.inventory.>","cm.alarm.>" --storage=file --ack --replicas=1 --retention=limits --max-bytes=2147483648 --discard=old --max-msgs=-1 --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 --dupe-window="2m0s" --no-allow-rollup --no-deny-delete --no-deny-purge
+               nats stream add aggregation-manager --subjects="am.>" --storage=file --no-ack --replicas=1 --retention=limits --max-bytes=2147483648 --discard=old --max-msgs=-1 --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 --dupe-window="2m0s" --no-allow-rollup --no-deny-delete --no-deny-purge
+               nats stream add EVENTS --subjects="plgd.>" --storage=file --ack --replicas=1 --retention=limits --max-bytes=2147483648 --discard=old --max-msgs=-1 --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 --dupe-window="2m0s" --no-allow-rollup --no-deny-delete --no-deny-purge
+               nats stream add MQTT --subjects="mqtt.*.report","mqtt.*.status" --storage=file --ack --replicas=1 --retention=limits --max-bytes=2147483648 --discard=old --max-msgs=-1 --max-msgs-per-subject=-1 --max-age=-1 --max-msg-size=-1 --dupe-window="2m0s" --no-allow-rollup --no-deny-delete --no-deny-purge
+          volumeMounts:
+            - name: nats-client
+              mountPath: "/certs/"
+              readOnly: true
+      restartPolicy: Never
+      volumes:
+        - name: nats-client
+          secret:
+            secretName: nats-server-tls

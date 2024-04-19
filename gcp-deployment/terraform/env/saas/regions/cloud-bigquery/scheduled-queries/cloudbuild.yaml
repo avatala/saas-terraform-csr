@@ -1,0 +1,151 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for host deployment
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    entrypoint: sh
+    secretEnv: ['BILLING_ID']
+    args:
+      - '-c'
+      - | 
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  terraform.tfvars.tpl > terraform.tfvars;
+        
+        sed -e "s/REGION_NAME/${_REGION}/g" main.tf.tpl > main.tf
+
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/BILLING_ACCOUNT_ID/`echo $$BILLING_ID | sed "s/-/_/g"`/g" host_prjct_query.tpl > host_prjct_query
+
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform init
+    id: terraform init for host
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt for host
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate for host
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform plan
+    id: terraform plan for host
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-admin-host.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform apply -input=false -auto-approve
+    id: terraform apply for host
+    entrypoint: sh 
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for service deployment
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    entrypoint: sh
+    args:
+      - '-c'
+      - | 
+
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g"  terraform.tfvars.tpl > terraform.tfvars;
+        
+        sed -e "s/REGION_NAME/${_REGION}/g" main.tf.tpl > main.tf
+        
+        sed  -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf
+
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" svc_prjct_query01.tpl > svc_prjct_query01
+
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" svc_prjct_query02.tpl > svc_prjct_query02
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" svc_prjct_query03.tpl > svc_prjct_query03
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" svc_prjct_query04.tpl > svc_prjct_query04
+
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-freemium-prj.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform init
+    id: terraform init for service
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt for service
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate for service
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-freemium-prj.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform plan
+    id: terraform plan for service
+    entrypoint: sh
+  - name: '${_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/terraform/env/saas/regions/cloud-bigquery/service-scheduled-queries
+    args:
+      - '-c'
+      - |
+        gcloud config set auth/impersonate_service_account ${_PREFIX}-cloudbq-sa@${_PREFIX}-freemium-prj.iam.gserviceaccount.com
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+        terraform apply -input=false -auto-approve
+        gcloud config unset auth/impersonate_service_account
+        export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+    id: terraform apply for service
+    entrypoint: sh
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'workload-identity-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+    logging: GCS_ONLY
+timeout: 86400s
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/BILLING_ID/versions/latest
+    env: 'BILLING_ID'

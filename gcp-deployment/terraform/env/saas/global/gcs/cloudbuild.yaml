@@ -1,0 +1,87 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Generate manifest for deployment
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    secretEnv: ['FREEMIUM_SUB_DOMAIN', 'ENTERPRISE_SUB_DOMAIN']
+    entrypoint: /bin/sh
+    args:
+      - '-c'
+      - | 
+        sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s|KMS_KEY|${_KMS_KEY_PATH}|g" terraform.tfvars.tpl > terraform.tfvars;
+        sed -e "s/TF_BUCKET_NAME/${_TFSTATE_GCS_BUCKET_NAME}/g" -e "s/PREFIX_NAME/${_PREFIX}/g" backend.tf.tpl > backend.tf;
+        sed -e "s/FULL_FREEMIUM_SUB_DOMAIN/$$FREEMIUM_SUB_DOMAIN/g" default.conf.tpl > default.conf;
+        sed -e "s/FULL_ENTERPRISE_SUB_DOMAIN/$$ENTERPRISE_SUB_DOMAIN/g" default-enterprise.conf.tpl > default-enterprise.conf;
+        sed -e "s/PREFIX_NAME/${_PREFIX}/g" -e "s/REGION_NAME/${_REGION}/g" main.tf.tpl > main.tf;
+
+  # - name: 'gcr.io/cloud-builders/gcloud'
+  #   entrypoint: 'bash'
+  #   args: 
+  #     - '-c'
+  #     - |
+  #       if [ "${_KMS_KEY_PATH}" = "null" ]; then
+  #         echo "Service agent not required"
+  #       else
+  #         gcloud beta services identity create --service=storage.googleapis.com --project=${_PREFIX}-admin-host
+  #         sleep 10
+  #       fi
+  #   id: 'Service Agent enable'
+    
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    args:
+      - '-c'
+      - |
+        terraform init
+    id: terraform init
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    args:
+      - '-c'
+      - |
+        terraform fmt
+    id: terraform fmt
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    args:
+      - '-c'
+      - |
+        terraform validate
+    id: terraform validate
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    args:
+      - '-c'
+      - |
+        terraform plan
+    id: terraform plan
+    entrypoint: sh
+  - name: 'hashicorp/terraform:1.0.7'
+    dir: gcp-deployment/terraform/env/saas/global/gcs
+    args:
+      - '-c'
+      - |
+        terraform apply -input=false -auto-approve
+    id: terraform apply
+    entrypoint: sh 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'builds', 'triggers', 'run', 'shared-vpc-${_PREFIX}-trigger', '--branch=${_BRANCH_NAME}']
+    id: 'trigger next build'
+logsBucket: 'gs://${_LOGS_GCS_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY 
+timeout: 86400s     
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_FREEMIUM_SUB_DOMAIN/versions/latest
+    env: 'FREEMIUM_SUB_DOMAIN'
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_ENTERPRISE_SUB_DOMAIN/versions/latest
+    env: 'ENTERPRISE_SUB_DOMAIN'   

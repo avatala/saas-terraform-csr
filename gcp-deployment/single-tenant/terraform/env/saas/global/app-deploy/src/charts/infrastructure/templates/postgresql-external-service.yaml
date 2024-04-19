@@ -1,0 +1,16 @@
+{{- if .Values.nodePortEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: inf-postgresql-external
+spec:
+  type: NodePort
+  ports:
+  - port: 5432
+    targetPort: 5432
+    nodePort: 30432
+    protocol: TCP 
+  selector:
+    app.kubernetes.io/instance: inf
+    app.kubernetes.io/name: postgresql
+{{- end }}

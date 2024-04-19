@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.mm.name  }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+
+
+  HTTP_PORT: {{ printf " " }}{{- include  "DomainManager.module-manager.port" . | quote}}
+  EXECUTOR_QUEUE_SIZE:  {{ printf " " }}{{ .Values.mm.config.ExecutorQueueSize | quote }}
+  JS_MAX_ACK_PENDING: {{ printf " " }}{{ .Values.mm.config.JsMacAckPending | quote }}
+  JS_ACK_WAIT: {{ printf " " }}{{ .Values.mm.config.jsAckWait | quote }}
+  LOG_LEVEL: {{ printf " " }}{{ .Values.mm.config.logLevel | quote }}
+  ISSUER_URL: {{ printf " " }}{{- include  "DomainManager.keycloakAddr" . | quote}}
+  INTROSPECT_TOKEN_CHECK: {{ printf " " }}{{ .Values.global.config.verifyToken | quote }}
+
+
+  # Temporal
+  temporal_namespace: {{ printf " " }}{{ .Values.mm.clients.temporal.namespace | quote }}
+  TEMPORAL_ADDR: {{ printf " " }}{{  .Values.mm.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+  TEMPORAL_TLS_ENABLED: "true"
+  TEMPORAL_TLS_CA: {{  .Values.mm.clients.temporal.tls.caPool  |  quote }}
+  TEMPORAL_TLS_KEY: {{  .Values.mm.clients.temporal.tls.keyFile  |  quote }}
+  TEMPORAL_TLS_CERT:  {{  .Values.mm.clients.temporal.tls.certFile  |  quote }}  
+  RETRY_POLICY_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.mm.clients.temporal.retry.executionTimeout | quote }}
+  RETRY_POLICY_MAXIMUM_ATTEMPS: {{ printf " " }}{{ .Values.mm.clients.temporal.retry.maximumAttemps | quote }}
+  RETRY_POLICY_MAXIMUM_INTERVAL: {{ printf " " }}{{ .Values.mm.clients.temporal.retry.maximumInterval | quote }}
+  WORKFLOW_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.mm.clients.temporal.workflow.executionTimeout | quote }}
+  CHILD_WORKFLOW_EXECUTION_TIMEOUT: {{ printf " " }}{{ .Values.mm.clients.temporal.child.executionTimeout | quote }}
+  START_TO_CLOSE_TIMEOUT: {{ printf " " }}{{ .Values.mm.clients.temporal.activity.startToCloseTimeout | quote }}
+  LOCAL_START_TO_CLOSE_TIMEOUT: {{ printf " " }}{{ .Values.mm.clients.temporal.local.startToCloseTimeout | quote }}
+  temporal_namespace: {{ printf " " }}{{ .Values.mm.clients.temporal.namespace | quote }}
+
+
+  #Jetstream
+  NATS_JETSTREAM:  {{ printf " " }}{{  .Values.mm.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamAddr" .) | quote}}
+  JETSTREAM_TLS_ENABLED: "true"
+  JETSTREAM_TLS_CA: {{  .Values.mm.clients.jetstream.tls.caPool  |  quote }}
+  JETSTREAM_TLS_KEY: {{  .Values.mm.clients.jetstream.tls.keyFile  |  quote }}
+  JETSTREAM_TLS_CERT:  {{  .Values.mm.clients.jetstream.tls.certFile  |  quote }}
+  
+  #MongoDB
+  MONGO_DB_ADDR:  {{ printf " " }}{{  .Values.mm.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBAddr" .) | quote}}
+  MONGO_TLS_ENABLED: "true"
+  MONGO_TLS_CA: {{  .Values.mm.clients.mongoDB.tls.caPool  |  quote }}
+  MONGO_TLS_KEY: {{  .Values.mm.clients.mongoDB.tls.keyFile  |  quote }}
+  MONGO_TLS_CERT:  {{  .Values.mm.clients.mongoDB.tls.certFile  |  quote }}
+
+  #Open Telemetry
+  {{- if .Values.global.clients.openTelemetry.uri }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.uri | quote }}
+  OPEN_TELEMETRY_TLS_ENABLED: "true"
+  OPEN_TELEMETRY_TLS_CA: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.caPool | quote }}
+  OPEN_TELEMETRY_TLS_CERT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.certFile | quote }}
+  OPEN_TELEMETRY_TLS_KEY: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.keyFile | quote }}
+  {{- end }}

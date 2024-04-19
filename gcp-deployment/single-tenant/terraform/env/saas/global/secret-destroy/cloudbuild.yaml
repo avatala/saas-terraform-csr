@@ -1,0 +1,185 @@
+# /*
+#  * Copyright 2022 Google LLC. 
+#  * 
+#  * This software is provided as-is, without warranty or representation for any use or purpose. 
+#  * Your use of it is subject to your agreement with Google.
+#  */
+steps:
+  - name: '${_PRE_REQ_REGION}-docker.pkg.dev/$PROJECT_ID/saas-cloud-build/saas-cloud-build-${_PREFIX}:latest'
+    dir: gcp-deployment/single-tenant/terraform/env/saas/global/secret-destroy/
+    entrypoint: 'bash'
+    env:
+      - "_CUSTOMER_NAME=${_CUSTOMER_NAME}"
+      - "_APIGEE=${_APIGEE}"
+    args:
+    - '-c'
+    - |
+      git fetch > /dev/null 2>&1
+      git checkout  ${_BRANCH_NAME}
+      if [ "${_LB_TYPE}" = "http" ]  && [ "${_APIGEE}" = "false"  ]; then
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/CUSTOMER_EMAIL/$$_CUSTOMER_EMAIL/g"  -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script.sh.tpl > script.sh;
+        sh script.sh
+        rm -rf script.sh
+      elif [ "${_LB_TYPE}" = "http" ]  && [ "${_APIGEE}" = "true"  ]; then
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/CUSTOMER_EMAIL/$$_CUSTOMER_EMAIL/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" appigee.sh.tpl > appigee.sh;
+        sh appigee.sh
+        rm -rf appigee.sh
+      else
+        sed -e "s/REGION/${_REGION}/g" -e "s/BUILD_PROJECT_ID/$PROJECT_ID/g" -e "s/CUSTOMER_NAME/${_CUSTOMER_NAME}/g" -e "s/CUSTOMER_EMAIL/$$_CUSTOMER_EMAIL/g" -e "s/BUILD_ID/$BUILD_ID/g" -e "s/FUNCTION_URI/`echo $$_CLOUD_FUNCTION_URI | sed 's#https://##'`/g" script-tcp.sh.tpl > script-tcp.sh;
+        sh script-tcp.sh
+        rm -rf script-tcp.sh
+      fi  
+    secretEnv: ['_CLOUD_FUNCTION_URI', '_CUSTOMER_EMAIL']
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: bash
+    id: 'delete on-boarding triggers'
+    args:
+      - '-c'
+      - |
+        if [[ "$$_CUSTOMER_REGION"=="$$_PRE_REQ_REGION" ]]; then
+          declare -A triggersArray=(
+          ["$$_CUSTOMER_REGION"]="
+          ${_CUSTOMER_NAME}-single-tenant-service-folder-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-service-project-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-service-account-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-custom-roles-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-iam-bindings-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-subnet-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-apigee-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-mig-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-backend-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-bigquery-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-scheduled-query-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-gke-cluster-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-workload-identity-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-deployment-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-tcp-deployment-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-tcp-tenant-mapping-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-iap-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-metrics-scope-trigger
+          ${_CUSTOMER_NAME}-single-tenant-custom-dashboard-trigger
+          ${_CUSTOMER_NAME}-single-tenant-secret-create-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-gke-asm-acm-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-dns-mapping-saas-trigger")
+        else
+          declare -A triggersArray=(
+          ["$$_CUSTOMER_REGION"]="
+          ${_CUSTOMER_NAME}-single-tenant-service-folder-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-service-project-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-service-account-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-custom-roles-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-iam-bindings-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-subnet-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-apigee-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-mig-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-backend-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-bigquery-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-scheduled-query-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-gke-cluster-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-workload-identity-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-deployment-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-tcp-deployment-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-tcp-tenant-mapping-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-iap-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-metrics-scope-trigger
+          ${_CUSTOMER_NAME}-single-tenant-custom-dashboard-trigger
+          ${_CUSTOMER_NAME}-single-tenant-secret-create-saas-trigger"
+
+          ["$$_PRE_REQ_REGION"]="
+          ${_CUSTOMER_NAME}-single-tenant-gke-asm-acm-saas-trigger
+          ${_CUSTOMER_NAME}-single-tenant-dns-mapping-saas-trigger")
+        fi
+
+        for region in "${!triggersArray[@]}";
+        do
+          for trigger in ${triggersArray[$region]};
+          do
+            gcloud builds triggers delete $trigger --region $region --quiet
+          done
+        done
+    secretEnv: ["_PRE_REQ_REGION","_CUSTOMER_REGION"]
+    
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: bash
+    id: 'delete customer secrets'
+    args:
+      - '-c'
+      - |
+        # Define a list of existing tenant secrets
+        if [ "${_LB_TYPE}" = "http" ]; then
+          secretsList="
+          ${_CUSTOMER_NAME}-CUSTOMER_EMAIL
+          ${_CUSTOMER_NAME}-MASTER_IP
+          ${_CUSTOMER_NAME}-POD_RANGE
+          ${_CUSTOMER_NAME}-SUBNET_IP
+          ${_CUSTOMER_NAME}-SVC_RANGE
+          ${_CUSTOMER_NAME}-TENANT_ID
+          ${_CUSTOMER_NAME}-CSR_TERRAFORM_REPO_NAME
+          ${_CUSTOMER_NAME}-LOG_BUCKET_NAME
+          ${_CUSTOMER_NAME}-CSR_APP_REPO_NAME
+          ${_CUSTOMER_NAME}-SEED_PROJECT_ID
+          ${_CUSTOMER_NAME}-PREFIX
+          ${_CUSTOMER_NAME}-MACHINE_TYPE
+          ${_CUSTOMER_NAME}-ZONE
+          ${_CUSTOMER_NAME}-MIN_COUNT
+          ${_CUSTOMER_NAME}-MAX_COUNT
+          ${_CUSTOMER_NAME}-NODE_COUNT
+          ${_CUSTOMER_NAME}-ORG_LOGO_URL
+          ${_CUSTOMER_NAME}-CUSTOMER_FOLDER_NAME
+          ${_CUSTOMER_NAME}-TF_STATE_BUCKET_NAME
+          ${_CUSTOMER_NAME}_IAP_SIGNED_HEADER
+          ${_CUSTOMER_NAME}-TENANT_DOMAIN"
+        else
+          secretsList="
+          ${_CUSTOMER_NAME}-CUSTOMER_EMAIL
+          ${_CUSTOMER_NAME}-MASTER_IP
+          ${_CUSTOMER_NAME}-POD_RANGE
+          ${_CUSTOMER_NAME}-SUBNET_IP
+          ${_CUSTOMER_NAME}-SVC_RANGE
+          ${_CUSTOMER_NAME}-TENANT_ID
+          ${_CUSTOMER_NAME}-CSR_TERRAFORM_REPO_NAME
+          ${_CUSTOMER_NAME}-LOG_BUCKET_NAME
+          ${_CUSTOMER_NAME}-CSR_APP_REPO_NAME
+          ${_CUSTOMER_NAME}-SEED_PROJECT_ID
+          ${_CUSTOMER_NAME}-PREFIX
+          ${_CUSTOMER_NAME}-MACHINE_TYPE
+          ${_CUSTOMER_NAME}-ZONE
+          ${_CUSTOMER_NAME}-MIN_COUNT
+          ${_CUSTOMER_NAME}-MAX_COUNT
+          ${_CUSTOMER_NAME}-NODE_COUNT
+          ${_CUSTOMER_NAME}-ORG_LOGO_URL
+          ${_CUSTOMER_NAME}-CUSTOMER_FOLDER_NAME
+          ${_CUSTOMER_NAME}-TF_STATE_BUCKET_NAME"
+        fi
+        
+        # Use new-line as separator and apply as pattern
+        for secret in ${secretsList//\\n/ }
+        do
+          gcloud secrets delete $secret --quiet
+        done
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - '-c'
+      - |-
+        if [ "${_APIGEE}" == "true" ];then
+          gcloud alpha builds triggers run ${_CUSTOMER_NAME}-single-tenant-apigee-components-saas-trigger --region ${_PRE_REQ_REGION} --branch=${_BRANCH_NAME} 
+        fi
+    id: 'trigger apigee-components build'
+    entrypoint: bash 
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_CLOUD_FUNCTION_URI/versions/latest
+    env: _CLOUD_FUNCTION_URI
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_EMAIL/versions/latest
+    env: _CUSTOMER_EMAIL
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_PREFIX}_PRE_REQ_REGION/versions/latest
+    env: _PRE_REQ_REGION
+  - versionName: projects/$PROJECT_NUMBER/secrets/${_CUSTOMER_NAME}-CUSTOMER_REGION/versions/latest
+    env: _CUSTOMER_REGION
+
+logsBucket: 'gs://${_LOG_BUCKET_NAME}'
+options:
+  logging: GCS_ONLY

@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "DomainManager.ndu-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "DomainManager.labels" . | nindent 4 }}
+    {{- with .Values.ndus.deploymentLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+  {{- with .Values.ndus.deploymentAnnotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.ndus.replicas }}
+  selector:
+    matchLabels:
+       {{- include "DomainManager.ndu-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.ndus.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "DomainManager.ndu-service.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.ndus.securityContext }}
+      securityContext:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+            {{- if .Values.ndus.rbac.enabled }}
+      serviceAccountName: {{ .Values.ndus.rbac.serviceAccountName }}
+            {{- end }}
+            {{- with .Values.ndus.image.imagePullSecrets }}
+      imagePullSecrets:
+              {{- toYaml . | nindent 8 }}
+            {{- end }}
+      restartPolicy: {{ .Values.ndus.restartPolicy }}
+
+      initContainers:
+        - name: check-mongodb-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for mongodb service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.ndus.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBSrvAddr" .) | quote}}
+        - name: check-nats-service
+          image: {{  .Values.global.images.initContainers.busybox  | default  ( include "DomainManager.busybox.image" .) | quote}}
+          command: ['sh', '-c', 'until nslookup $(SERVER_ADDR); do echo waiting for nats service; sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " " }}{{  .Values.ndus.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}          
+        - name: check-temporal-service
+          image: {{  .Values.global.images.initContainers.temporalAdminTools  | default  ( include "DomainManager.temporal-admin-tools.image" .) | quote}}
+          command: ['sh', '-c', 'until tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  cluster health; do echo waiting for temporal service; sleep 5; done;']
+          env: 
+            - name: TEMPORAL_CLI_ADDRESS
+              value: {{ printf " " }}{{  .Values.ndus.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+          volumeMounts:
+            {{- with .Values.ndus.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        - name: check-temporal-service-2
+          image: {{  .Values.global.images.initContainers.temporalAdminTools  | default  ( include "DomainManager.temporal-admin-tools.image" .) | quote}}
+          command: ['sh', '-c', 'until tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  --namespace ipm namespace describe; do tctl --tls_ca_path /certs/temporal/ca.crt --tls_cert_path /certs/temporal/tls.crt --tls_key_path /certs/temporal/tls.key  --namespace ipm namespace register; sleep 5; done;']
+          env: 
+            - name: TEMPORAL_CLI_ADDRESS
+              value: {{ printf " " }}{{  .Values.ndus.clients.temporal.uri  | default  ( include "DomainManager.temporalAddr" .) | quote}}
+          volumeMounts:
+            {{- with .Values.ndus.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        - name: check-jetstream-stream-cm
+          image: {{  .Values.global.images.initContainers.natsbox  | default  ( include "DomainManager.nats-box.image" .) | quote}}
+          command: ['sh', '-c', 'until  [[ "$(SERVER_ADDR)" =~ "^CM\\n" ]]; do echo waiting for nats stream CM to be created $(SERVER_ADDR); sleep 5; done;']
+          env:
+            - name: SERVER_ADDR
+              value: {{ printf " $(nats -s " }}{{  .Values.ndus.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamSrvAddr" .) | quote}}{{printf " --tlscert=/certs/jetstream/tls.crt --tlskey=/certs/jetstream/tls.key --tlsca=/certs/jetstream/ca.crt stream ls -n)"}}
+          volumeMounts:
+            {{- with .Values.ndus.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}    
+      containers:
+        - name: {{ .Values.ndus.name }}
+          image: {{ include "DomainManager.ndu-service.image" . | quote }}
+          imagePullPolicy: {{ .Values.ndus.image.pullPolicy }}
+          ports:
+            - name: ndus-port
+              containerPort: {{ .Values.ndus.port | default "8080"}}
+              protocol: TCP
+          {{- with .Values.ndus.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.ndus.name  }}-configmap
+          volumeMounts:
+            {{- with .Values.ndus.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}   
+            {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}    
+      restartPolicy: {{ .Values.ndus.restartPolicy }}
+
+      volumes:
+        - name: {{ .Values.ndus.config.volume }}
+          configMap:
+            name: {{ include "DomainManager.ndu-service.configName" . }}
+        {{- with .Values.ndus.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+status: { }

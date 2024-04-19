@@ -1,0 +1,12 @@
+{
+  "userManaged":{
+    "replicas":[
+      {
+        "location":"REGION",
+        "customerManagedEncryption":{
+          "kmsKeyName":"KMS_KEY"
+        }
+      }
+    ]
+  }
+}

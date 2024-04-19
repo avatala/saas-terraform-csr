@@ -1,0 +1,47 @@
+{{- if .Values.grafana.ingress.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-crt
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otelinfndb.labels" . | nindent 4 }}    
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-10"  
+spec:
+  secretName: grafana-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "grafana.localhost"
+  dnsNames:
+    - "grafana.localhost"
+  isCA: false
+{{- end }}
+
+{{- if .Values.collector.influxdb.ingress.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: influxdb-crt
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otelinfndb.labels" . | nindent 4 }}    
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-10"  
+spec:
+  secretName: influxdb-tls
+  issuerRef:
+    name: ipm-ca-issuer
+    kind: {{ if .Values.useGoogleCASIssuer }}GoogleCASClusterIssuer{{ else }}ClusterIssuer{{ end }}
+    group: {{ if .Values.useGoogleCASIssuer }}cas-issuer.jetstack.io{{ else }}cert-manager.io{{ end }}
+  commonName: "influxdb.localhost"
+  dnsNames:
+    - "influxdb.localhost"
+  isCA: false
+{{- end }}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "DomainManager.device-aggregator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "DomainManager.labels" . | nindent 4 }}
+      {{- with .Values.da.service.labels }}
+      {{- . | toYaml | nindent 4 }}
+      {{- end }}
+spec:
+  type: {{ .Values.da.service.type | default "ClusterIP" }}
+  ports:
+  - name: da-port
+    port: {{ .Values.da.port | default "8080" }}
+    targetPort: da-port
+  selector:
+   {{- include "DomainManager.device-aggregator.selectorLabels" . | nindent 4 }}

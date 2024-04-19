@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.eg.name  }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+
+  HTTP_PORT: {{ printf " " }}{{- include  "DomainManager.event-gateway.port" . | quote}}
+  #OTEL_EXPORTER_OTLP_ENDPOINT:
+  EXECUTOR_QUEUE_SIZE:  {{ printf " " }}{{ .Values.eg.config.ExecutorQueueSize | quote }}
+  JS_MAX_ACK_PENDING: {{ printf " " }}{{ .Values.eg.config.JsMacAckPending | quote }}
+  JS_ACK_WAIT: {{ printf " " }}{{ .Values.eg.config.jsAckWait | quote }}
+  LOG_LEVEL: {{ printf " " }}{{ .Values.eg.config.logLevel | quote }}
+  ISSUER_URL: {{ printf " " }}{{- include  "DomainManager.keycloakAddr" . | quote}}
+  INTROSPECT_TOKEN_CHECK: {{ printf " " }}{{ .Values.global.config.verifyToken | quote }}
+
+
+  #Jetstream
+  NATS_JETSTREAM:  {{ printf " " }}{{  .Values.eg.clients.jetstream.uri  | default  ( include "DomainManager.jetstreamAddr" .) | quote}}
+  JETSTREAM_TLS_ENABLED: "true"
+  JETSTREAM_TLS_CA: {{  .Values.eg.clients.jetstream.tls.caPool  |  quote }}
+  JETSTREAM_TLS_KEY: {{  .Values.eg.clients.jetstream.tls.keyFile  |  quote }}
+  JETSTREAM_TLS_CERT:  {{  .Values.eg.clients.jetstream.tls.certFile  |  quote }}
+  
+  #MongoDB
+  MONGO_DB_ADDR:  {{ printf " " }}{{  .Values.eg.clients.mongoDB.uri  | default  ( include "DomainManager.mongoDBAddr" .) | quote}}
+  MONGO_TLS_ENABLED: "true"
+  MONGO_TLS_CA: {{  .Values.eg.clients.mongoDB.tls.caPool  |  quote }}
+  MONGO_TLS_KEY: {{  .Values.eg.clients.mongoDB.tls.keyFile  |  quote }}
+  MONGO_TLS_CERT:  {{  .Values.eg.clients.mongoDB.tls.certFile  |  quote }}
+
+  #Open Telemetry
+  {{- if .Values.global.clients.openTelemetry.uri }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.uri | quote }}
+  OPEN_TELEMETRY_TLS_ENABLED: "true"
+  OPEN_TELEMETRY_TLS_CA: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.caPool | quote }}
+  OPEN_TELEMETRY_TLS_CERT: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.certFile | quote }}
+  OPEN_TELEMETRY_TLS_KEY: {{ printf " " }}{{ .Values.global.clients.openTelemetry.tls.keyFile | quote }}
+  {{- end }}

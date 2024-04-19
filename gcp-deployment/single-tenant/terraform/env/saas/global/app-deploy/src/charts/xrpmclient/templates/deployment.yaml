@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "xrpmclient.fullname" . }}
+  labels:
+    {{- include "xrpmclient.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "xrpmclient.labels" . | nindent 8 }}
+	{{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+          
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "xrpmclient.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+       - name: xrpm-simulator
+         image: "{{ .Values.global.infnRegistry.url }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+         imagePullPolicy: {{ .Values.image.pullPolicy }}
+         volumeMounts:
+          - name: xrsimulator-configmap
+            mountPath: /app/config/config.yml
+            subPath: config.yml
+          - name: xrsimulator-configmap-resourcedata
+            mountPath: /app/zarf/uc/docker/resourcedata.yaml
+            subPath: resourcedata.yaml
+      restartPolicy: Never       
+      volumes:
+       - name: xrsimulator-configmap
+         configMap:
+          name: xrsimulatorconfig
+       - name: xrsimulator-configmap-resourcedata
+         configMap:
+          name: xrsimulatorconfig-resourcedata
